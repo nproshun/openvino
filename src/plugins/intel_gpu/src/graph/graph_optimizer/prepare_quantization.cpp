@@ -231,8 +231,11 @@ void prepare_quantization::prepare_scale_shift_opt(program &p, quantize_node& qu
 
     auto out_is_int8 = quantize_node.get_output_layout().data_type == data_types::i8;
     auto out_is_uint8 = quantize_node.get_output_layout().data_type == data_types::u8;
-    auto out_is_fp = !(out_is_int8 || out_is_uint8);
-    bool need_clamp = levels != 256 || out_is_fp;
+    auto out_is_int16 = quantize_node.get_output_layout().data_type == data_types::i16;
+    auto out_is_uint16 = quantize_node.get_output_layout().data_type == data_types::u16;
+
+    auto out_is_fp = !(out_is_int8 || out_is_uint8 || out_is_int16 || out_is_uint16);
+    bool need_clamp = levels != 256 || levels != 65536 || out_is_fp;
     bool need_min_clamp = need_clamp;
     bool need_max_clamp = need_clamp;
 
@@ -241,6 +244,14 @@ void prepare_quantization::prepare_scale_shift_opt(program &p, quantize_node& qu
         if ((out_is_int8 && out_lo_val == -128.f) || (out_is_uint8 && out_lo_val == 0.f))
             need_min_clamp = false;
         if ((out_is_int8 && out_hi_val == 127.f) || (out_is_uint8 && out_hi_val == 255.f))
+            need_max_clamp = false;
+    }
+
+    // Check that we can optimize clamp operation for int16/uint16 data using saturation clamp only
+    if (per_tensor_out_range && !out_is_fp && levels != 65536) {
+        if ((out_is_int16 && out_lo_val == -32768.f) || (out_is_uint16 && out_lo_val == 0.f))
+            need_min_clamp = false;
+        if ((out_is_int16 && out_hi_val == 32767.f) || (out_is_uint16 && out_hi_val == 65535.f))
             need_max_clamp = false;
     }
 
@@ -322,7 +333,7 @@ void prepare_quantization::handle_quantize_node(program& p, quantize_node& quant
         return;
 
     auto l = quantize_node.get_primitive()->levels;
-    if (l > 2 && l <= 256 && !quantize_node.get_scale_shift_opt()) {
+    if (l > 2 && l <= 65536 && !quantize_node.get_scale_shift_opt()) {
         prepare_scale_shift_opt(p, quantize_node);
     }
 }
@@ -411,6 +422,7 @@ void prepare_quantization::remove_fake_reorders(program& p, reorder_node& reorde
 
     auto &usr = reorder_node.get_users().front();
     auto &dep = reorder_node.get_dependency(0);
+    // TODO: add logic for int16
     if (!(usr->is_type<convolution>() && usr->get_input_layout(1).data_type == data_types::i8) ||
         !dep.is_input() ||
         dep.get_output_layout().data_type != data_types::u8 ||

@@ -59,14 +59,17 @@ using namespace cldnn;
 void prepare_primitive_fusing::run(program& p) {
     GPU_DEBUG_IF(p.get_config().get_disable_post_ops_fusions())
         return;
-
+    p.dump_program("before_fusing",true);
     fuse_reorders(p);
     remove_redundant_reshape(p);
     fuse_swiglu(p);
     fuse_bias(p);
+    p.dump_program("fuse_bias", true);
     fuse_simple_primitives(p);
+    p.dump_program("fuse_simple", true);
     fuse_constant_transposes(p);
     optimize_fused_ops(p);
+    p.dump_program("after_fusing", true);
 }
 
 void prepare_primitive_fusing::remove_redundant_reshape(program &p) {
@@ -544,7 +547,7 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
             auto in_dt = node.get_input_layout(0).data_type;
 
             // TODO: check if that's enough for correct work
-            return data_type_traits::is_i8_u8(in_dt);
+            return data_type_traits::is_i8_u8(in_dt) || data_type_traits::is_i16_u16(in_dt);
         };
 
         auto fc_supports_fusings = [&](fully_connected_node& node) -> bool {
@@ -874,6 +877,8 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
             auto in_dt = input_data.get_input_layout(0).data_type;
             auto out_dt_is_i8_u8 = data_type_traits::is_i8_u8(out_dt);
             auto in_dt_is_i8_u8 = data_type_traits::is_i8_u8(in_dt);
+            auto out_dt_is_i16_u16 = data_type_traits::is_i16_u16(out_dt);
+            auto in_dt_is_i16_u16 = data_type_traits::is_i16_u16(in_dt);
 
             bool per_tensor_values = quantize_node.get_scale_shift_opt() &&
                                      quantize_node.get_per_tensor_input_scale() &&
@@ -890,7 +895,7 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
                             in_layout.format == format::bs_fs_yx_bsv32_fsv16 ||
                            // Avoid fusing to b_fs_yx_fsv16 (and similar) kernels
                            (lo.has_all_enabled_onednn_impls_optimization_attribute()) ||
-                           (in_dt_is_i8_u8 && out_dt_is_i8_u8) ||
+                           (in_dt_is_i8_u8 && out_dt_is_i8_u8) || (in_dt_is_i16_u16 && out_dt_is_i16_u16) ||
                            (lo.should_select_b_fs_yx_fsv16_layout(input_data.as<convolution>(), input_data.get_input_layout(1)) &&
                             !is_grouped_conv(input_data.as<convolution>())));
 

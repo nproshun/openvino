@@ -278,7 +278,10 @@ public:
     static bool canBeTransformedStatic(const std::shared_ptr<Node>& layer,
         const std::vector<ov::element::Type>& defaultPrecisions = precision_set::get_int8_support());
 
-    bool canSubtractBeHandled(const std::shared_ptr<Node>& op, const FakeQuantizeDequantization& dequantization) const;
+    bool canSubtractBeHandled(
+        const std::shared_ptr<Node>& op,
+        const FakeQuantizeDequantization& dequantization,
+        const std::vector<ov::element::Type>& defaultPrecisions = precision_set::get_int8_support()) const;
 
     // Get precision based on FakeQuantize operation.
     // Undefined value is expected. In this case the accuracy has to be defined by the calling code.

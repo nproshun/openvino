@@ -94,6 +94,15 @@ ov::Tensor get_compensation(std::shared_ptr<ov::Node> w, std::shared_ptr<ov::Nod
         return get_compensation<int8_t, uint8_t>(&w_tensor, &azp_tensor, wzp_const ? &wzp_tensor : nullptr, groups);
     else if (w_const->get_element_type() == ov::element::i8 && azp_const->get_element_type() == ov::element::i8)
         return get_compensation<int8_t, int8_t>(&w_tensor, &azp_tensor, wzp_const ? &wzp_tensor : nullptr, groups);
+    else if (w_const->get_element_type() == ov::element::i8 && azp_const->get_element_type() == ov::element::i16)
+        return get_compensation<int8_t, int16_t>(&w_tensor, &azp_tensor, wzp_const ? &wzp_tensor : nullptr, groups);
+    else if (w_const->get_element_type() == ov::element::i8 && azp_const->get_element_type() == ov::element::u16)
+        return get_compensation<int8_t, uint16_t>(&w_tensor, &azp_tensor, wzp_const ? &wzp_tensor : nullptr, groups);
+    else if (w_const->get_element_type() == ov::element::u8 && azp_const->get_element_type() == ov::element::i16)
+        return get_compensation<uint8_t, int16_t>(&w_tensor, &azp_tensor, wzp_const ? &wzp_tensor : nullptr, groups);
+    else if (w_const->get_element_type() == ov::element::u8 && azp_const->get_element_type() == ov::element::u16)
+        return get_compensation<uint8_t, uint16_t>(&w_tensor, &azp_tensor, wzp_const ? &wzp_tensor : nullptr, groups);
+
 
     OPENVINO_THROW("[GPU] Unsupported element types combination for quantized weights and zero-points");
 }
@@ -113,8 +122,9 @@ public:
 };
 
 AsymmetricConvolutionMatcher::AsymmetricConvolutionMatcher() {
-    auto input_m = any_input(type_matches_any({ov::element::u8, ov::element::i8}));
-    auto azp_const_m = wrap_type<ov::op::v0::Constant>(consumers_count(1) && type_matches_any({ov::element::u8, ov::element::i8}));
+    auto input_m = any_input(type_matches_any({ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16}));
+    auto azp_const_m =
+        wrap_type<ov::op::v0::Constant>(consumers_count(1) && type_matches_any({ov::element::u8, ov::element::i8, ov::element::u16, ov::element::i16}));
     auto azp_subtract_m = wrap_type<ov::op::v1::Subtract>({input_m, azp_const_m});
 
     auto weights_m = wrap_type<ov::op::v0::Constant>(type_matches_any({ov::element::u8, ov::element::i8}));
