@@ -514,10 +514,6 @@ void program::init_graph() {
 
     apply_opt_pass<mark_nodes>();
     for (auto& node : processing_order) {
-        if (node->is_type<convolution>()) {
-            auto& conv_node = node->as<convolution>();
-            std::cout << "Num zero points = "<<  conv_node.weights_zero_points().get_output_layout().count() << std::endl;
-        }
         if (!node->is_type<data>())
             node->get_output_layouts();
         }
