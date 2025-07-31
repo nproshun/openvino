@@ -70,7 +70,7 @@ static constexpr std::array<TypeInfo, enum_types_size> types_info = {
     type_info(64, true, true, false, "double", "f64", f64_aliases),                               // f64
     type_info(4, false, true, true, "int4_t", "i4", i4_aliases),                                  // i4
     type_info(8, false, true, true, "int8_t", "i8", i8_aliases),                                  // i8
-    type_info(16, false, true, false, "int16_t", "i16", i16_aliases),                             // i16
+    type_info(16, false, true, true, "int16_t", "i16", i16_aliases),                             // i16
     type_info(32, false, true, true, "int32_t", "i32", i32_aliases),                              // i32
     type_info(64, false, true, false, "int64_t", "i64", i64_aliases),                             // i64
     type_info(1, false, false, false, "uint1_t", "u1", u1_aliases),                               // u1
@@ -79,7 +79,7 @@ static constexpr std::array<TypeInfo, enum_types_size> types_info = {
     type_info(4, false, false, false, "uint4_t", "u4", u4_aliases),                               // u4
     type_info(6, false, false, false, "uint6_t", "u6", u6_aliases),                               // u6
     type_info(8, false, false, true, "uint8_t", "u8", u8_aliases),                                // u8
-    type_info(16, false, false, false, "uint16_t", "u16", u16_aliases),                           // u16
+    type_info(16, false, false, true, "uint16_t", "u16", u16_aliases),                           // u16
     type_info(32, false, false, false, "uint32_t", "u32", u32_aliases),                           // u32
     type_info(64, false, false, false, "uint64_t", "u64", u64_aliases),                           // u64
     type_info(4, false, false, true, "nfloat4", "nf4", nf4_aliases),                              // nf4

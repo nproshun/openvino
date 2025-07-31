@@ -59,7 +59,7 @@ bool WeightableLayerTransformation::canConvolutionBeTransformed(
     }
 
     FakeQuantizeDequantization dequantization = NetworkHelper::getDequantization(layer, defaultPrecisions);
-    if (!canSubtractBeHandled(layer, dequantization)) {
+    if (!canSubtractBeHandled(layer, dequantization, defaultPrecisions)) {
         return false;
     }
 

@@ -80,6 +80,7 @@ static bool convert_data(memory::ptr mem, stream& stream) {
 }
 
 bool condition_inst::get_pred_from_memory(memory::ptr mem, stream& stream) {
+    // TODO: add logic for int16
     auto mem_dt = mem->get_layout().data_type;
     switch (mem_dt) {
         case cldnn::data_types::f32:

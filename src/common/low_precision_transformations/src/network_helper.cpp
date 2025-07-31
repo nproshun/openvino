@@ -657,7 +657,9 @@ std::shared_ptr<ov::Node> NetworkHelper::separateInStandaloneBranch(std::shared_
     return newNode;
 }
 
-std::shared_ptr<ov::opset1::FakeQuantize> NetworkHelper::fuseConvert(const std::shared_ptr<ov::opset1::FakeQuantize>& fakeQuantize) {
+std::shared_ptr<ov::opset1::FakeQuantize> NetworkHelper::fuseConvert(
+    const std::shared_ptr<ov::opset1::FakeQuantize>& fakeQuantize,
+    const std::vector<ov::element::Type>& defaultPrecisions) {
     const Output<Node> output = fakeQuantize->output(0);
     const auto targetInputs = output.get_target_inputs();
     if (targetInputs.size() != 1ul) {
@@ -667,7 +669,8 @@ std::shared_ptr<ov::opset1::FakeQuantize> NetworkHelper::fuseConvert(const std::
     Node* node = targetInputs.begin()->get_node();
     if (!ov::is_type<ov::opset1::Convert>(node) ||
         // TODO: LPT: avoid precision hardcode: to separate method: isSupportedPrecision
-        ((node->get_output_element_type(0) != element::u8) && (node->get_output_element_type(0) != element::i8))) {
+        std::find(defaultPrecisions.begin(), defaultPrecisions.end(), node->get_output_element_type(0)) ==
+            defaultPrecisions.end()) {
         return fakeQuantize;
     }
 
@@ -1260,6 +1263,8 @@ FakeQuantizeDequantization NetworkHelper::getDequantizationBelow(const std::shar
 
     if (convert != nullptr) {
         if ((convert->input(0).get_element_type() != element::i8) && (convert->input(0).get_element_type() != element::u8) &&
+            (convert->input(0).get_element_type() != element::i16) &&
+            (convert->input(0).get_element_type() != element::u16) &&
             (convert->output(0).get_element_type() != element::f32)) {
             return FakeQuantizeDequantization();
         }
@@ -1800,6 +1805,9 @@ bool NetworkHelper::checkZeroPoint(const std::shared_ptr<Node>& node, const Data
         if (type == element::u8 || type == element::i8) {
             min = DataPrecision::getMinValue(type, levels::int8) - 0.5f;
             max = DataPrecision::getMaxValue(type, levels::int8) + 0.5f;
+        } else if (type == element::u16 || type == element::i16) {
+            min = DataPrecision::getMinValue(type, levels::int16) - 0.5f;
+            max = DataPrecision::getMaxValue(type, levels::int16) + 0.5f;
         } else {
             return type == element::f32 || type == element::f16;
         }

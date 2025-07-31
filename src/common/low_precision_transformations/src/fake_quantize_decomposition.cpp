@@ -282,7 +282,7 @@ bool FakeQuantizeDecompositionTransformation::transform(ov::pass::pattern::Match
         return false;
     }
 
-    auto layer = NetworkHelper::fuseConvert(node);
+    auto layer = NetworkHelper::fuseConvert(node, defaultPrecisions);
     bool rewritten = layer.get() != node.get();
     if (rewritten) {
         register_new_node(layer);

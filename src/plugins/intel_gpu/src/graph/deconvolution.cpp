@@ -26,6 +26,7 @@ layout deconvolution_inst::calc_output_layout(deconvolution_node const& node, ke
     weights_layout = weights_layout.convert_to_weights_layout(desc->grouped_weights_shape);
 
     auto data_type = input_layout.data_type;
+    // TODO: add logic for int16
     if ((input_layout.data_type == data_types::i8 || input_layout.data_type == data_types::u8) && !impl_param.has_fused_primitives()) {
         data_type = data_types::f32;
     }
@@ -112,6 +113,7 @@ std::vector<layout> deconvolution_inst::calc_output_layouts(deconvolution_node c
 
     auto input_type = input_layout.data_type;
     auto output_type = input_type;
+    // TODO: add logic for int16
     if ((input_type == data_types::i8 || input_type == data_types::u8) && !impl_param.has_fused_primitives()) {
         output_type = data_types::f32;
     }

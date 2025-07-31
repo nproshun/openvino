@@ -212,7 +212,9 @@ public:
     static std::shared_ptr<ov::Node> separateInStandaloneBranch(std::shared_ptr<ov::Node> node,
         const std::vector<ov::element::Type>& defaultPrecisions = precision_set::get_int8_support());
 
-    static std::shared_ptr<ov::opset1::FakeQuantize> fuseConvert(const std::shared_ptr<ov::opset1::FakeQuantize>& fakeQuantize);
+    static std::shared_ptr<ov::opset1::FakeQuantize> fuseConvert(
+        const std::shared_ptr<ov::opset1::FakeQuantize>& fakeQuantize,
+        const std::vector<ov::element::Type>& defaultPrecisions = precision_set::get_int8_support());
 
     static std::vector<element::Type> precisionIntersection(
             const std::vector<element::Type>& v1,

@@ -74,7 +74,7 @@ void Convolution::validate_and_infer_types() {
                               ", filters element type: ",
                               filters_et,
                               ").");
-    } else if (data_batch_et == ov::element::u8 || data_batch_et == ov::element::i8) {
+    } else if (data_batch_et == ov::element::u8 || data_batch_et == ov::element::i8 || data_batch_et == ov::element::u16 || data_batch_et == ov::element::i16) {
         result_et = ov::element::f32;
     }
 

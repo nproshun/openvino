@@ -56,6 +56,7 @@ void pre_replace_deconv::run(program& p) {
                                !((lo.get_optimization_attributes().b_fs_yx_fsv16_network || input_layout.format == format::b_fs_yx_fsv16) &&
                                 lo.is_format_optimized(deconv_node, format::b_fs_yx_fsv16));
                 // int8/uint8 input
+                // TODO: enable for int16
                 perform_opt |= (input_layout.data_type == data_types::i8 || input_layout.data_type == data_types::u8);
 
                 if (!perform_opt)

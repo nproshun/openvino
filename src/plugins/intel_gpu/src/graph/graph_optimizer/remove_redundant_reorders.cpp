@@ -94,6 +94,7 @@ void remove_redundant_reorders::run(program& p) {
 
             // Avoid different data types between input and output
             auto same_data_type = input.get_output_layout().data_type == output_layout.data_type;
+            // TODO: add int16 logic
             auto i8_u8_input = input.get_output_layout().data_type == data_types::i8 ||
                                input.get_output_layout().data_type == data_types::u8;
             auto quantize_user = has_quantize_user(node);

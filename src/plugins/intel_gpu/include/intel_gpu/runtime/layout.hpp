@@ -51,6 +51,12 @@ struct data_type_traits {
         return et.is_quantized() && et.bitwidth() == 8;
     }
 
+    static bool is_i16_u16(data_types data_type) {
+        auto et = ov::element::Type(data_type);
+        return et.is_quantized() && et.bitwidth() == 16;
+    }
+
+
     static bool is_i4_u4(data_types data_type) {
         auto et = ov::element::Type(data_type);
         return et.bitwidth() == 4;
@@ -121,8 +127,8 @@ inline ::std::ostream& operator<<(::std::ostream& os, const data_types& dt) {
 
 inline data_types element_type_to_data_type(ov::element::Type t) {
     switch (t) {
-    case ov::element::Type_t::i16:
-    case ov::element::Type_t::u16:
+    //case ov::element::Type_t::i16:
+    //case ov::element::Type_t::u16:
     case ov::element::Type_t::f64:
         return cldnn::data_types::f32;
     case ov::element::Type_t::u32:

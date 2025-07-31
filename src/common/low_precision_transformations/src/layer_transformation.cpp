@@ -134,7 +134,10 @@ bool LayerTransformation::canBeTransformedSpatialDimension(const std::shared_ptr
     return true;
 }
 
-bool LayerTransformation::canSubtractBeHandled(const std::shared_ptr<Node>& op, const FakeQuantizeDequantization& dequantization) const {
+bool LayerTransformation::canSubtractBeHandled(
+    const std::shared_ptr<Node>& op,
+    const FakeQuantizeDequantization& dequantization,
+    const std::vector<ov::element::Type>& defaultPrecisions) const {
     if (dequantization.empty() || (dequantization.subtract == nullptr)) {
         return true;
     }
@@ -147,7 +150,7 @@ bool LayerTransformation::canSubtractBeHandled(const std::shared_ptr<Node>& op, 
         dequantization.subtract->input(0).get_element_type() :
         dequantization.convert->input(0).get_element_type();
 
-    if ((operationType != element::i8) && (operationType != element::u8)) {
+    if (std::find(defaultPrecisions.begin(), defaultPrecisions.end(), operationType) == defaultPrecisions.end()) {
         return false;
     }
 

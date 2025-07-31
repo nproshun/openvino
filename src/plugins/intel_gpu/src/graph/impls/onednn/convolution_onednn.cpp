@@ -200,7 +200,7 @@ protected:
             auto& a_zp = arg.activations_zero_points();
             auto a_zp_dtype = a_zp.get_output_layout().data_type;
 
-            if (!data_type_traits::is_i8_u8(a_zp_dtype) && a_zp_dtype != data_types::i32) {
+            if (!data_type_traits::is_i8_u8(a_zp_dtype) && !data_type_traits::is_i16_u16(a_zp_dtype) && a_zp_dtype != data_types::i32) {
                 throw std::runtime_error("Unsupported data type for activations zero points for oneDNN convolution");
             }
 
@@ -208,6 +208,10 @@ protected:
                 set_activation_zero_points_attr<ov::element_type_traits<data_types::i8>::value_type>(attrs, a_zp.as<data>(), zero_point_mask);
             } else if (a_zp_dtype == data_types::u8) {
                 set_activation_zero_points_attr<ov::element_type_traits<data_types::u8>::value_type>(attrs, a_zp.as<data>(), zero_point_mask);
+            } else if (a_zp_dtype == data_types::i16) {
+                set_activation_zero_points_attr<ov::element_type_traits<data_types::i16>::value_type>(attrs, a_zp.as<data>(), zero_point_mask);
+            } else if (a_zp_dtype == data_types::u16) {
+                set_activation_zero_points_attr<ov::element_type_traits<data_types::u16>::value_type>(attrs, a_zp.as<data>(), zero_point_mask);
             } else if (a_zp_dtype == data_types::i32) {
                 set_activation_zero_points_attr<ov::element_type_traits<data_types::i32>::value_type>(attrs, a_zp.as<data>(), zero_point_mask);
             }
