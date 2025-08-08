@@ -267,7 +267,8 @@ bool LowPrecision::run_on_model(const std::shared_ptr<ov::Model>& m) {
     ADD_MATCHER(common, FakeQuantizeTransformation, params)
     ADD_MATCHER(common, InterpolateTransformation, params)
     ADD_MATCHER(common, GroupConvolutionTransformation, params)
-    ADD_MATCHER(common, MatMulTransformation, params)
+    // Add u16 and i16 to default precisions to support MatMul
+    ADD_MATCHER(common, MatMulTransformation, params_int16)
     ADD_MATCHER(common, MaxPoolTransformation, params)
     ADD_MATCHER(common, MultiplyPartialTransformation, params)
     ADD_MATCHER(common, MVNTransformation, params)

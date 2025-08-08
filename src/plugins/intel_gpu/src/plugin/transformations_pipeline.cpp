@@ -1161,7 +1161,9 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
         manager.set_per_pass_validation(false);
 
         manager.register_pass<ov::intel_gpu::ClampFP16Output>();
+        manager.register_pass<ov::pass::Serialize>("BeforeConvertMatMulToFullyConnected.xml", "BeforeConvertMatMulToFullyConnected.bin");
         manager.register_pass<ov::intel_gpu::ConvertMatMulToFullyConnected>();
+        manager.register_pass<ov::pass::Serialize>("AfterConvertMatMulToFullyConnected.xml", "AfterConvertMatMulToFullyConnected.bin");
         manager.register_pass<ov::intel_gpu::MoveFCReshapeToWeights>();
         manager.register_pass<ov::intel_gpu::ConvertFullyConnectedToFullyConnectedCompressed>();
 

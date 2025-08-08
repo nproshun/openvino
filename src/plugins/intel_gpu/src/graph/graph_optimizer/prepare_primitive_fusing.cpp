@@ -563,7 +563,7 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
                 return true;
             } else {
                 auto in_dt = node.get_input_layout(0).data_type;
-                return node.is_dynamic() || data_type_traits::is_i8_u8(in_dt);
+                return node.is_dynamic() || data_type_traits::is_i8_u8(in_dt) || data_type_traits::is_i16_u16(in_dt);
             }
         };
 
@@ -578,9 +578,10 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
                 data_type_traits::is_floating_point(in1_dt))
                 does_support_fusings = true;
 
-            if (data_type_traits::is_i8_u8(in0_dt) && in0_fmt == format::bfyx &&
+            // int8 activations or int16 activations, int8 for weights
+            if ((data_type_traits::is_i8_u8(in0_dt) || data_type_traits::is_i16_u16(in0_dt)) && in0_fmt == format::bfyx &&
                 data_type_traits::is_i8_u8(in1_dt) && in1_fmt == format::bfyx) {
-                if (node.get_inputs_count() == 3) {
+                if (node.get_inputs_count() == 3) { // not sure what should happen for int16 case, is that the same as for int8?
                     auto in2_dt = node.get_input_layout(2).data_type;
                     auto in2_fmt = node.get_input_layout(2).format;
                     does_support_fusings = data_type_traits::is_i8_u8(in2_dt) && in2_fmt == format::bfyx ? true : false;
