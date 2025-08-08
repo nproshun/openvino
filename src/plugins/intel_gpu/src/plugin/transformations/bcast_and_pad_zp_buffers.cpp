@@ -55,6 +55,12 @@ std::shared_ptr<ov::Node> pad_quantization_parameter(std::shared_ptr<ov::op::v0:
         case ov::element::i8:
             bcast_and_pad(static_cast<const int8_t*>(qp->get_data_ptr()), static_cast<int8_t*>(new_qp.data()), prev_size, new_size, aligned_size);
             break;
+        case ov::element::u16:
+            bcast_and_pad(static_cast<const uint16_t*>(qp->get_data_ptr()), static_cast<uint16_t*>(new_qp.data()), prev_size, new_size, aligned_size);
+            break;
+        case ov::element::i16:
+            bcast_and_pad(static_cast<const int16_t*>(qp->get_data_ptr()), static_cast<int16_t*>(new_qp.data()), prev_size, new_size, aligned_size);
+            break;
         case ov::element::f16:
             bcast_and_pad(static_cast<const ov::float16*>(qp->get_data_ptr()), static_cast<ov::float16*>(new_qp.data()), prev_size, new_size, aligned_size);
             break;
@@ -98,6 +104,10 @@ std::shared_ptr<ov::Node> scalar_parameter(std::shared_ptr<ov::op::v0::Constant>
         new_qp = create_scalar_constant<uint8_t>(qp);
     } else if (type == ov::element::i8) {
         new_qp = create_scalar_constant<int8_t>(qp);
+    } else if (type == ov::element::i16) {
+        new_qp = create_scalar_constant<int16_t>(qp);  
+    } else if (type == ov::element::u16) {
+        new_qp = create_scalar_constant<uint16_t>(qp);
     } else if (type == ov::element::f16) {
         new_qp = create_scalar_constant<ov::float16>(qp);
     } else if (type == ov::element::f32) {
@@ -112,7 +122,7 @@ std::shared_ptr<ov::Node> scalar_parameter(std::shared_ptr<ov::op::v0::Constant>
 }  // namespace
 
 BroadcastAndPadZeroPointBuffers::BroadcastAndPadZeroPointBuffers(size_t pad_size, bool supports_immad) {
-    auto input_m = any_input(type_matches_any({ov::element::u8, ov::element::i8}));
+    auto input_m = any_input(type_matches_any({ov::element::u8, ov::element::i8, ov::element::i16, ov::element::u16}));
     auto weights_m = any_input(type_matches_any({ov::element::u8, ov::element::i8}));
     auto bias_m = any_input();
     auto azp_m = wrap_type<ov::op::v0::Constant, op::Placeholder>();

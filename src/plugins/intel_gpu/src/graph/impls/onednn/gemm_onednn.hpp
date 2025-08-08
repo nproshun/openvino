@@ -16,6 +16,21 @@ struct GemmImplementationManager : public ImplementationManager {
     GemmImplementationManager(shape_types shape_type) : ImplementationManager(impl_types::onednn, shape_type) {}
     std::unique_ptr<primitive_impl> create_impl(const program_node& node, const kernel_impl_params& params) const override;
 
+    static constexpr std::array supported_formats = {
+        format::any,
+        format::bfyx,
+        format::bfxy,
+        format::byxf,
+        format::byfx,
+        format::bxfy,
+        format::fybx,  // format used for gemm fusion
+        format::fyxb,  // format used for gemm fusion
+        format::xbfy,  // format used for gemm fusion
+        format::ybfx,  // format used for gemm fusion
+        format::bfzyx,
+        format::bfwzyx,
+    };
+
     bool validate_impl(const program_node& node) const override {
         assert(node.is_type<gemm>());
         const auto& config = node.get_program().get_config();
@@ -32,21 +47,6 @@ struct GemmImplementationManager : public ImplementationManager {
         auto in0_dt = in0_layout.data_type;
         auto in1_dt = in1_layout.data_type;
         auto out_dt = out_layout.data_type;
-
-        static const std::vector<format::type> supported_formats = {
-            format::any,
-            format::bfyx,
-            format::bfxy,
-            format::byxf,
-            format::byfx,
-            format::bxfy,
-            format::fybx,  //format used for gemm fusion
-            format::fyxb,  //format used for gemm fusion
-            format::xbfy, // format used for gemm fusion
-            format::ybfx, // format used for gemm fusion
-            format::bfzyx,
-            format::bfwzyx,
-        };
 
         if (gemm_prim->alpha != 1.0f || gemm_prim->beta != 0.0f)
             return false;
@@ -69,12 +69,16 @@ struct GemmImplementationManager : public ImplementationManager {
             return false;
         }
 
-        bool f16f16_case = everyone_is(data_types::f16, in0_dt, in1_dt) && one_of(out_dt, {data_types::f16, data_types::f32, data_types::i8});
-        bool u8s8_case = one_of(in0_dt, {data_types::i8, data_types::u8}) &&
-                         one_of(in1_dt, {data_types::i8, data_types::u8}) &&
-                         one_of(out_dt, {data_types::f16, data_types::f32, data_types::i32, data_types::i8, data_types::u8});
+        const bool f16f16_case = everyone_is(data_types::f16, in0_dt, in1_dt) && 
+                                 one_of(out_dt, {data_types::f16, data_types::f32, data_types::i8});
+        const bool u8s8_case =  one_of(in0_dt, {data_types::i8, data_types::u8}) &&
+                                one_of(in1_dt, {data_types::i8, data_types::u8}) &&
+                                one_of(out_dt, {data_types::f16, data_types::f32, data_types::i32, data_types::i8, data_types::u8});
+        const bool u16s8_case = one_of(in0_dt, {data_types::i16, data_types::u16}) && 
+                                one_of(in1_dt, {data_types::i8, data_types::u8}) &&
+                                one_of(out_dt, {data_types::f16, data_types::f32, data_types::i32, data_types::u16, data_types::i16});
 
-        if (!f16f16_case && !u8s8_case)
+        if (!f16f16_case && !u8s8_case && !u16s8_case)
             return false;
 
         if (gemm_prim->indirect_a || gemm_prim->indirect_b)

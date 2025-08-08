@@ -21,6 +21,40 @@ struct ConvolutionImplementationManager : public ImplementationManager {
     ConvolutionImplementationManager(shape_types shape_type) : ImplementationManager(impl_types::onednn, shape_type) {}
     std::unique_ptr<primitive_impl> create_impl(const program_node& node, const kernel_impl_params& params) const override;
 
+    static constexpr std::array supported_formats = {
+        format::any,
+        format::bfyx,
+        format::bfzyx,
+        format::byxf,
+        format::bzyxf,
+        format::b_fs_yx_fsv8,
+        format::b_fs_zyx_fsv8,
+        format::b_fs_yx_fsv16,
+        format::b_fs_zyx_fsv16,
+        format::b_fs_yx_fsv32,
+        format::b_fs_zyx_fsv32,
+        format::bs_fs_yx_bsv4_fsv2,
+        format::bs_fs_yx_bsv4_fsv4,
+        format::bs_fs_yx_bsv8_fsv2,
+        format::bs_fs_zyx_bsv8_fsv2,
+        format::bs_fs_yx_bsv8_fsv4,
+        format::bs_fs_zyx_bsv8_fsv4,
+        format::bs_fs_yx_bsv16_fsv2,
+        format::bs_fs_zyx_bsv16_fsv2,
+        format::bs_fs_yx_bsv16_fsv4,
+        format::bs_fs_zyx_bsv16_fsv4,
+        format::bs_fs_yx_bsv16_fsv8,
+        format::bs_fs_zyx_bsv16_fsv8,
+        format::bs_fs_yx_bsv16_fsv16,
+        format::bs_fs_zyx_bsv16_fsv16,
+        format::bs_fs_yx_bsv16_fsv32,
+        format::bs_fs_zyx_bsv16_fsv32,
+        format::bs_fs_yx_bsv32_fsv16,
+        format::bs_fs_zyx_bsv32_fsv16,
+        format::bs_fs_yx_bsv32_fsv32,
+        format::bs_fs_zyx_bsv32_fsv32,
+    };
+
     bool validate_impl(const program_node& node) const override {
         assert(node.is_type<convolution>());
         const auto& config = node.get_program().get_config();
@@ -41,40 +75,6 @@ struct ConvolutionImplementationManager : public ImplementationManager {
         auto wei_dt = wei_layout.data_type;
         auto out_dt = out_layout.data_type;
 
-        static const std::vector<format> supported_formats = {
-            format::any,
-            format::bfyx,
-            format::bfzyx,
-            format::byxf,
-            format::bzyxf,
-            format::b_fs_yx_fsv8,
-            format::b_fs_zyx_fsv8,
-            format::b_fs_yx_fsv16,
-            format::b_fs_zyx_fsv16,
-            format::b_fs_yx_fsv32,
-            format::b_fs_zyx_fsv32,
-            format::bs_fs_yx_bsv4_fsv2,
-            format::bs_fs_yx_bsv4_fsv4,
-            format::bs_fs_yx_bsv8_fsv2,
-            format::bs_fs_zyx_bsv8_fsv2,
-            format::bs_fs_yx_bsv8_fsv4,
-            format::bs_fs_zyx_bsv8_fsv4,
-            format::bs_fs_yx_bsv16_fsv2,
-            format::bs_fs_zyx_bsv16_fsv2,
-            format::bs_fs_yx_bsv16_fsv4,
-            format::bs_fs_zyx_bsv16_fsv4,
-            format::bs_fs_yx_bsv16_fsv8,
-            format::bs_fs_zyx_bsv16_fsv8,
-            format::bs_fs_yx_bsv16_fsv16,
-            format::bs_fs_zyx_bsv16_fsv16,
-            format::bs_fs_yx_bsv16_fsv32,
-            format::bs_fs_zyx_bsv16_fsv32,
-            format::bs_fs_yx_bsv32_fsv16,
-            format::bs_fs_zyx_bsv32_fsv16,
-            format::bs_fs_yx_bsv32_fsv32,
-            format::bs_fs_zyx_bsv32_fsv32,
-        };
-
         if (!one_of(in_fmt, supported_formats) || !one_of(out_fmt, supported_formats))
             return false;
 
@@ -89,8 +89,10 @@ struct ConvolutionImplementationManager : public ImplementationManager {
         bool u8s8_conv = one_of(in_dt, {data_types::i8, data_types::u8}) &&
                          wei_dt == data_types::i8 &&
                          one_of(out_dt, {data_types::i32, data_types::f16, data_types::f32, data_types::u8, data_types::i8});
+        bool u16s16_conv = one_of(in_dt, {data_types::i16, data_types::u16}) && one_of(wei_dt, {data_types::i8, data_types::u8}) &&
+                        one_of(out_dt, {data_types::i32, data_types::f16, data_types::f32, data_types::i16, data_types::u16});
 
-        if (!f16_conv && !u8s8_conv)
+        if (!f16_conv && !u8s8_conv && !u16s16_conv)
             return false;
 
         if (!is_supported_post_ops(conv_node))

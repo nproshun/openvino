@@ -30,6 +30,8 @@ cldnn::memory::ptr convert_zp_data_to_s32(const memory::ptr zp_memory) {
 
 template cldnn::memory::ptr convert_zp_data_to_s32<int8_t>(const memory::ptr zp_memory);
 template cldnn::memory::ptr convert_zp_data_to_s32<uint8_t>(const memory::ptr zp_memory);
+template cldnn::memory::ptr convert_zp_data_to_s32<int16_t>(const memory::ptr zp_memory);
+template cldnn::memory::ptr convert_zp_data_to_s32<uint16_t>(const memory::ptr zp_memory);
 template cldnn::memory::ptr convert_zp_data_to_s32<int32_t>(const memory::ptr zp_memory);
 
 cldnn::format default_fmt_for_dims(size_t dims, bool is_grouped) {
@@ -129,6 +131,8 @@ dnnl::memory::data_type convert_data_type(cldnn::data_types dt) {
         case cldnn::data_types::f16: return dnnl::memory::data_type::f16;
         case cldnn::data_types::i8: return dnnl::memory::data_type::s8;
         case cldnn::data_types::u8: return dnnl::memory::data_type::u8;
+        case cldnn::data_types::i16: return dnnl::memory::data_type::s16;
+        case cldnn::data_types::u16: return dnnl::memory::data_type::u16;
         case cldnn::data_types::i32: return dnnl::memory::data_type::s32;
         case cldnn::data_types::i4: return dnnl::memory::data_type::s4;
         case cldnn::data_types::u4: return dnnl::memory::data_type::u4;
@@ -263,6 +267,8 @@ int64_t get_offset(const cldnn::layout& l, dnnl::memory::desc&& desc) {
             return offset;
         case dnnl::memory::data_type::f16:
         case dnnl::memory::data_type::bf16:
+        case dnnl::memory::data_type::s16:
+        case dnnl::memory::data_type::u16:
             return (offset * 2);
         case dnnl::memory::data_type::f32:
         case dnnl::memory::data_type::s32:
@@ -629,6 +635,8 @@ bool is_per_tensor(cldnn::data_node& node, int32_t& zp_val) {
 
 template bool is_per_tensor<int8_t>(cldnn::data_node& node, int32_t& zp_val);
 template bool is_per_tensor<uint8_t>(cldnn::data_node& node, int32_t& zp_val);
+template bool is_per_tensor<int16_t>(cldnn::data_node& node, int32_t& zp_val);
+template bool is_per_tensor<uint16_t>(cldnn::data_node& node, int32_t& zp_val);
 template bool is_per_tensor<int32_t>(cldnn::data_node& node, int32_t& zp_val);
 
 

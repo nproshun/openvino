@@ -224,6 +224,9 @@ bool LowPrecision::run_on_model(const std::shared_ptr<ov::Model>& m) {
     RUN_ON_FUNCTION_SCOPE(LowPrecision);
     OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::LPT_LT, "LowPrecision");
 
+    auto params_int16 = params;
+    params_int16.defaultPrecisions.insert(params_int16.defaultPrecisions.end(), {ov::element::u16, ov::element::i16});
+
     Manager manager(get_pass_config(), "LowPrecision");
     const auto prerequisites = manager.register_pass<GraphRewrite>();
     const std::vector<ov::element::Type> supportedTypes = {ov::element::i8, ov::element::u8};
@@ -234,7 +237,7 @@ bool LowPrecision::run_on_model(const std::shared_ptr<ov::Model>& m) {
 
     manager.register_pass<TypeRelaxedReplacer>();
 
-    AttributeParameters attributeParams(params.deqPrecision, params.defaultPrecisions);
+    AttributeParameters attributeParams(params_int16.deqPrecision, params_int16.defaultPrecisions);
     manager.register_pass<low_precision::MarkupOptimizations>(precisionRestrictions,
                                                               quantizationRestrictions,
                                                               attributeParams);
@@ -247,10 +250,12 @@ bool LowPrecision::run_on_model(const std::shared_ptr<ov::Model>& m) {
     ADD_MATCHER(common, BroadcastTransformation, params)
     ADD_MATCHER(common, ClampTransformation, params)
     ADD_MATCHER(common, ConcatTransformation, params)
-    ADD_MATCHER(common, ConvolutionTransformation, params)
+    // Add u16 and i16 to default precisions to support Convolution
+    ADD_MATCHER(common, ConvolutionTransformation, params_int16)
     ADD_MATCHER(common, ConvolutionBackpropDataTransformation, params)
     ADD_MATCHER(common, DepthToSpaceTransformation, params)
-    ADD_MATCHER(common, FakeQuantizeDecompositionTransformation, params)
+    // Add u16 and i16 to default precisions to support FakeQuantizeDecompositionTransformation
+    ADD_MATCHER(common, FakeQuantizeDecompositionTransformation, params_int16)
     // In case of floating point low precision (e.g. fp8), FakeConvert is used for quantization
     if (std::any_of(params.defaultPrecisions.begin(),
                     params.defaultPrecisions.end(),
@@ -262,7 +267,8 @@ bool LowPrecision::run_on_model(const std::shared_ptr<ov::Model>& m) {
     ADD_MATCHER(common, FakeQuantizeTransformation, params)
     ADD_MATCHER(common, InterpolateTransformation, params)
     ADD_MATCHER(common, GroupConvolutionTransformation, params)
-    ADD_MATCHER(common, MatMulTransformation, params)
+    // Add u16 and i16 to default precisions to support MatMul
+    ADD_MATCHER(common, MatMulTransformation, params_int16)
     ADD_MATCHER(common, MaxPoolTransformation, params)
     ADD_MATCHER(common, MultiplyPartialTransformation, params)
     ADD_MATCHER(common, MVNTransformation, params)

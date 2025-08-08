@@ -315,6 +315,7 @@ void minimize_local_reorders(program& p, std::map<program_node*, format::type>& 
         auto preferred_format = lo.get_preferred_format(*node);
 
         if (preferred_format != format::any) {
+            // TODO: Add int16 logic
             if (preferred_format == format::b_fs_yx_fsv4 &&
                 (node->get_output_layout().data_type == data_types::i8 || node->get_output_layout().data_type == data_types::u8)) {
                 std::set<format::type> io_formats;

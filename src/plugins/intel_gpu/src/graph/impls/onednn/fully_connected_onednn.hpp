@@ -51,16 +51,18 @@ struct FullyConnectedImplementationManager : public ImplementationManager {
         if (!is_supported_pad(in_layout) || !is_supported_pad(out_layout))
             LOG_AND_RETURN_FALSE(node);
 
-        bool f16f16_case = everyone_is(data_types::f16, in0_dt, wei_dt) && one_of(out_dt, {data_types::f16, data_types::f32, data_types::i8});
-        bool f32f32_case = everyone_is(data_types::f32, in0_dt, wei_dt);
-        bool u8s8_case = one_of(in0_dt, {data_types::i8, data_types::u8}) &&
-                         one_of(wei_dt, {data_types::i8, data_types::u8}) &&
-                         one_of(out_dt, {data_types::f16, data_types::f32, data_types::i32, data_types::i8, data_types::u8});
-        bool compressed_case = fc_prim->compressed_weights &&
-                               one_of(in0_dt, {data_types::f16, data_types::f32, data_types::i8, data_types::u8}) &&
-                               one_of(wei_dt, {data_types::u8, data_types::i8, data_types::u4, data_types::i4}) &&
-                               one_of(out_dt, {data_types::f16, data_types::f32, data_types::u8, data_types::i8});
-        if (!f16f16_case && !f32f32_case && !u8s8_case && !compressed_case)
+        const bool f16f16_case = everyone_is(data_types::f16, in0_dt, wei_dt) && one_of(out_dt, {data_types::f16, data_types::f32, data_types::i8});
+        const bool f32f32_case = everyone_is(data_types::f32, in0_dt, wei_dt);
+        const bool u8s8_case = one_of(in0_dt, {data_types::i8, data_types::u8}) &&
+                               one_of(wei_dt, {data_types::i8, data_types::u8}) &&
+                               one_of(out_dt, {data_types::f16, data_types::f32, data_types::i32, data_types::i8, data_types::u8});
+        const bool u16s8_case = one_of(in0_dt, {data_types::i16, data_types::u16}) && one_of(wei_dt, {data_types::i8, data_types::u8}) &&
+                                one_of(out_dt, {data_types::f16, data_types::f32, data_types::i32, data_types::u16, data_types::i16});
+        const bool compressed_case = fc_prim->compressed_weights &&
+                                     one_of(in0_dt, {data_types::f16, data_types::f32, data_types::i8, data_types::u8}) &&
+                                     one_of(wei_dt, {data_types::u8, data_types::i8, data_types::u4, data_types::i4}) &&
+                                     one_of(out_dt, {data_types::f16, data_types::f32, data_types::u8, data_types::i8});
+        if (!f16f16_case && !f32f32_case && !u8s8_case && ! u16s8_case && !compressed_case)
             LOG_AND_RETURN_FALSE(node);
 
         if (fc_prim->compressed_weights) {

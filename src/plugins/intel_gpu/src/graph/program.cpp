@@ -516,7 +516,7 @@ void program::init_graph() {
     for (auto& node : processing_order) {
         if (!node->is_type<data>())
             node->get_output_layouts();
-    }
+        }
     // Perform initial shape_of subgraphs markup
     apply_opt_pass<mark_shape_of_subgraphs>();
 }
@@ -1264,7 +1264,7 @@ void program::remove_nodes(std::vector<program_node*>& to_remove) {
 // TODO: break this function into number of smaller ones + add per-primitive fields (possibly use
 // primitive_inst::to_string?)
 void program::dump_program(const char* stage, bool with_full_info) const {
-    std::string path = get_dir_path(_config);
+    std::string path = "./graphs/";//get_dir_path(_config);
     if (path.empty() || !with_full_info) {
         return;
     }

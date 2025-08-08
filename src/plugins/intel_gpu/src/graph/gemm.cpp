@@ -87,7 +87,7 @@ layout gemm_inst::calc_output_layout(gemm_node const& node, kernel_impl_params c
         output_shape = transpose_shape(output_shape, prim->output_transpose_order);
 
     auto output_type = input0_layout.data_type;
-    if ((output_type == data_types::u8 || output_type == data_types::i8) && prim->output_data_types[0])
+    if ((output_type == data_types::u8 || output_type == data_types::i8 || output_type == data_types::i16 || output_type == data_types::u16) && prim->output_data_types[0])
         output_type = *prim->output_data_types[0];
 
     if (impl_param.has_fused_primitives()) {

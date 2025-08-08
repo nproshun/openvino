@@ -59,14 +59,17 @@ using namespace cldnn;
 void prepare_primitive_fusing::run(program& p) {
     GPU_DEBUG_IF(p.get_config().get_disable_post_ops_fusions())
         return;
-
+    p.dump_program("before_fusing",true);
     fuse_reorders(p);
     remove_redundant_reshape(p);
     fuse_swiglu(p);
     fuse_bias(p);
+    p.dump_program("fuse_bias", true);
     fuse_simple_primitives(p);
+    p.dump_program("fuse_simple", true);
     fuse_constant_transposes(p);
     optimize_fused_ops(p);
+    p.dump_program("after_fusing", true);
 }
 
 void prepare_primitive_fusing::remove_redundant_reshape(program &p) {
@@ -544,7 +547,7 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
             auto in_dt = node.get_input_layout(0).data_type;
 
             // TODO: check if that's enough for correct work
-            return data_type_traits::is_i8_u8(in_dt);
+            return data_type_traits::is_i8_u8(in_dt) || data_type_traits::is_i16_u16(in_dt);
         };
 
         auto fc_supports_fusings = [&](fully_connected_node& node) -> bool {
@@ -560,7 +563,7 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
                 return true;
             } else {
                 auto in_dt = node.get_input_layout(0).data_type;
-                return node.is_dynamic() || data_type_traits::is_i8_u8(in_dt);
+                return node.is_dynamic() || data_type_traits::is_i8_u8(in_dt) || data_type_traits::is_i16_u16(in_dt);
             }
         };
 
@@ -575,9 +578,10 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
                 data_type_traits::is_floating_point(in1_dt))
                 does_support_fusings = true;
 
-            if (data_type_traits::is_i8_u8(in0_dt) && in0_fmt == format::bfyx &&
+            // int8 activations or int16 activations, int8 for weights
+            if ((data_type_traits::is_i8_u8(in0_dt) || data_type_traits::is_i16_u16(in0_dt)) && in0_fmt == format::bfyx &&
                 data_type_traits::is_i8_u8(in1_dt) && in1_fmt == format::bfyx) {
-                if (node.get_inputs_count() == 3) {
+                if (node.get_inputs_count() == 3) { // not sure what should happen for int16 case, is that the same as for int8?
                     auto in2_dt = node.get_input_layout(2).data_type;
                     auto in2_fmt = node.get_input_layout(2).format;
                     does_support_fusings = data_type_traits::is_i8_u8(in2_dt) && in2_fmt == format::bfyx ? true : false;
@@ -874,6 +878,8 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
             auto in_dt = input_data.get_input_layout(0).data_type;
             auto out_dt_is_i8_u8 = data_type_traits::is_i8_u8(out_dt);
             auto in_dt_is_i8_u8 = data_type_traits::is_i8_u8(in_dt);
+            auto out_dt_is_i16_u16 = data_type_traits::is_i16_u16(out_dt);
+            auto in_dt_is_i16_u16 = data_type_traits::is_i16_u16(in_dt);
 
             bool per_tensor_values = quantize_node.get_scale_shift_opt() &&
                                      quantize_node.get_per_tensor_input_scale() &&
@@ -890,7 +896,7 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
                             in_layout.format == format::bs_fs_yx_bsv32_fsv16 ||
                            // Avoid fusing to b_fs_yx_fsv16 (and similar) kernels
                            (lo.has_all_enabled_onednn_impls_optimization_attribute()) ||
-                           (in_dt_is_i8_u8 && out_dt_is_i8_u8) ||
+                           (in_dt_is_i8_u8 && out_dt_is_i8_u8) || (in_dt_is_i16_u16 && out_dt_is_i16_u16) ||
                            (lo.should_select_b_fs_yx_fsv16_layout(input_data.as<convolution>(), input_data.get_input_layout(1)) &&
                             !is_grouped_conv(input_data.as<convolution>())));
 

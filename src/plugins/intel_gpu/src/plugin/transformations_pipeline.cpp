@@ -357,10 +357,12 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
         auto is_model_quantized = ov::pass::low_precision::LowPrecision::isFunctionQuantized(func);
         enableInt8 = config.get_enable_lp_transformations() && is_model_quantized;
 
-        manager.register_pass<ov::pass::MarkDequantization>(
-            std::vector<ov::element::Type>{ ov::element::i8, ov::element::u8, ov::element::i4, ov::element::u4 },
-            !device_info.supports_immad);
+        manager.register_pass<ov::pass::Serialize>("Initial.xml", "Initial.bin");
 
+        manager.register_pass<ov::pass::MarkDequantization>(
+            std::vector<ov::element::Type>{ ov::element::i16, ov::element::u16, ov::element::i8, ov::element::u8, ov::element::i4, ov::element::u4 },
+            !device_info.supports_immad);
+       
         manager.register_pass<ov::pass::InitNodeInfo>();
         manager.register_pass<EinsumDecomposition>();
 
@@ -463,14 +465,15 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
 
         manager.register_pass<ov::pass::KeepDequantizationPrecision>(
             ov::element::TypeVector{ov::element::i32, ov::element::u32, ov::element::u16}, add_precision_sensitive_convert);
-
+        manager.register_pass<ov::pass::Serialize>("BeforeFirstConvertPrecision.xml", "BeforeFirstConvertPrecision.bin");
         manager.register_pass<ov::pass::ConvertPrecision>(fp_convert_precision_map,
                                                           empty_fuse_map,
                                                           keep_precision_sensitive_in_fp32_1,
                                                           convert_input_output_precision,
                                                           store_original_precision_as_rt_attribute);
-
+        manager.register_pass<ov::pass::Serialize>("AfterFirstConvertPrecision.xml", "AfterFirstConvertPrecision.bin");
         manager.register_pass<ov::pass::CommonOptimizations>();
+        manager.register_pass<ov::pass::Serialize>("AfterCommon.xml", "AfterCommon.bin");
 
         // In the case of "input -> reshape -> convert -> multiply",
         // the "input -> reshape" subgraph is constant-folded in the above "CommonOptimizations"
@@ -642,8 +645,8 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
         precisions_map int_convert_precision_map{
             {ov::element::i64, ov::element::i32},
             {ov::element::u64, ov::element::i32},
-            {ov::element::i16, ov::element::i32},
-            {ov::element::u16, ov::element::i32},
+            //{ov::element::i16, ov::element::i32},
+            //{ov::element::u16, ov::element::i32},
             {ov::element::u32, ov::element::i32},
             {ov::element::boolean, ov::element::u8},
             {ov::element::i4, ov::element::i8},
@@ -895,7 +898,7 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
                        ov::is_type<ov::op::v1::Convolution>(first_dep) ||
                        ov::is_type<ov::op::v1::Convolution>(second_dep);
         });
-
+        manager.register_pass<ov::pass::Serialize>("AfterFirstPass.xml", "AfterFirstPass.bin");
         manager.run_passes(func);
     }
 
@@ -905,7 +908,7 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
 
         auto supportedPrecisions = std::vector<PrecisionsRestriction>({
             PrecisionsRestriction::create<ov::op::v1::Convolution>({
-                {{0}, {ov::element::u8, ov::element::i8}},
+                {{0}, {ov::element::u8, ov::element::i8, ov::element::i16, ov::element::u16}},
                 {{1}, {ov::element::i8}},
             }),
             PrecisionsRestriction::create<ov::op::v1::ConvolutionBackpropData>({
@@ -1039,6 +1042,7 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
             reshapeIgnorePerTensorQuantizationCheck = true;
         auto params = LayerTransformation::Params(true, element::f32, defaultPrecisions, reshapeIgnorePerTensorQuantizationCheck);
         lptManager.register_pass<LowPrecision>(supportedPrecisions, perTensorQuantization, params);
+        lptManager.register_pass<ov::pass::Serialize>("AfterLptPass.xml", "AfterLptPass.bin");
         lptManager.run_passes(func);
     }
 
@@ -1157,7 +1161,9 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
         manager.set_per_pass_validation(false);
 
         manager.register_pass<ov::intel_gpu::ClampFP16Output>();
+        manager.register_pass<ov::pass::Serialize>("BeforeConvertMatMulToFullyConnected.xml", "BeforeConvertMatMulToFullyConnected.bin");
         manager.register_pass<ov::intel_gpu::ConvertMatMulToFullyConnected>();
+        manager.register_pass<ov::pass::Serialize>("AfterConvertMatMulToFullyConnected.xml", "AfterConvertMatMulToFullyConnected.bin");
         manager.register_pass<ov::intel_gpu::MoveFCReshapeToWeights>();
         manager.register_pass<ov::intel_gpu::ConvertFullyConnectedToFullyConnectedCompressed>();
 
@@ -1213,7 +1219,9 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
         auto kv_cache_compression_dt = config.get_kv_cache_precision();
         manager.register_pass<ov::intel_gpu::KVCacheCompression>(kv_cache_compression_dt, device_info.supports_immad);
 
+        manager.register_pass<ov::pass::Serialize>("BeforeConvertConvolutionToInternal.xml", "BeforeConvertConvolutionToInternal.bin");
         manager.register_pass<ov::intel_gpu::ConvertConvolutionToInternal>();
+        manager.register_pass<ov::pass::Serialize>("AfterConvertConvolutionToInternal.xml", "AfterConvertConvolutionToInternal.bin");
 
         // This pass should be done after asymmetric quantization matching as it can move zp subtraction upper in the graph
         manager.register_pass<ov::pass::MoveEltwiseUpThroughDataMovPerChannel>();
@@ -1299,6 +1307,7 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
         GPU_DEBUG_IF(config.get_verbose() >= 1) {
             manager.register_pass<ov::intel_gpu::PrintModelStatistics>();
         }
+        manager.register_pass<ov::pass::Serialize>("AfterFinalPass.xml", "AfterFinalPass.bin");
         manager.run_passes(func);
     }
 }
