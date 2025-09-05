@@ -224,24 +224,21 @@ bool LowPrecision::run_on_model(const std::shared_ptr<ov::Model>& m) {
     RUN_ON_FUNCTION_SCOPE(LowPrecision);
     OV_ITT_SCOPE(FIRST_INFERENCE, itt::domains::LPT_LT, "LowPrecision");
 
-    auto params_int16 = params;
-    params_int16.defaultPrecisions.insert(params_int16.defaultPrecisions.end(), {ov::element::u16, ov::element::i16});
-
     Manager manager(get_pass_config(), "LowPrecision");
     const auto prerequisites = manager.register_pass<GraphRewrite>();
-    const std::vector<ov::element::Type> supportedTypes = {ov::element::i8, ov::element::u8};
+    const std::vector<ov::element::Type> supportedTypes = {ov::element::i8, ov::element::u8, ov::element::i16, ov::element::u16};
     ADD_MATCHER(prerequisites, PullReshapeThroughDequantization, supportedTypes)
     ADD_MATCHER(prerequisites, PullTransposeThroughDequantization, supportedTypes)
     ADD_MATCHER(prerequisites, LinOpSequenceFusion)
     ADD_MATCHER(prerequisites, MoveFakeQuantize)
-
+    manager.register_pass<ov::pass::Serialize>("AfterLptPass1.xml", "AfterLptPass1.bin");
     manager.register_pass<TypeRelaxedReplacer>();
 
-    AttributeParameters attributeParams(params_int16.deqPrecision, params_int16.defaultPrecisions);
+    AttributeParameters attributeParams(params.deqPrecision, params.defaultPrecisions);
     manager.register_pass<low_precision::MarkupOptimizations>(precisionRestrictions,
                                                               quantizationRestrictions,
                                                               attributeParams);
-
+    manager.register_pass<ov::pass::Serialize>("AfterLptPass2.xml", "AfterLptPass2.bin");
     const auto common = manager.register_pass<GraphRewrite>();
     ADD_MATCHER(common, AddTransformation, params)
     ADD_MATCHER(common, AssignAndReadValueTransformation, m, params)
@@ -250,12 +247,10 @@ bool LowPrecision::run_on_model(const std::shared_ptr<ov::Model>& m) {
     ADD_MATCHER(common, BroadcastTransformation, params)
     ADD_MATCHER(common, ClampTransformation, params)
     ADD_MATCHER(common, ConcatTransformation, params)
-    // Add u16 and i16 to default precisions to support Convolution
-    ADD_MATCHER(common, ConvolutionTransformation, params_int16)
+    ADD_MATCHER(common, ConvolutionTransformation, params)
     ADD_MATCHER(common, ConvolutionBackpropDataTransformation, params)
     ADD_MATCHER(common, DepthToSpaceTransformation, params)
-    // Add u16 and i16 to default precisions to support FakeQuantizeDecompositionTransformation
-    ADD_MATCHER(common, FakeQuantizeDecompositionTransformation, params_int16)
+    ADD_MATCHER(common, FakeQuantizeDecompositionTransformation, params)
     // In case of floating point low precision (e.g. fp8), FakeConvert is used for quantization
     if (std::any_of(params.defaultPrecisions.begin(),
                     params.defaultPrecisions.end(),
@@ -267,8 +262,7 @@ bool LowPrecision::run_on_model(const std::shared_ptr<ov::Model>& m) {
     ADD_MATCHER(common, FakeQuantizeTransformation, params)
     ADD_MATCHER(common, InterpolateTransformation, params)
     ADD_MATCHER(common, GroupConvolutionTransformation, params)
-    // Add u16 and i16 to default precisions to support MatMul
-    ADD_MATCHER(common, MatMulTransformation, params_int16)
+    ADD_MATCHER(common, MatMulTransformation, params)
     ADD_MATCHER(common, MaxPoolTransformation, params)
     ADD_MATCHER(common, MultiplyPartialTransformation, params)
     ADD_MATCHER(common, MVNTransformation, params)
@@ -296,7 +290,7 @@ bool LowPrecision::run_on_model(const std::shared_ptr<ov::Model>& m) {
     for (const auto& tr : additional_main_passes) {
         common->add_matcher(tr);
     }
-
+    manager.register_pass<ov::pass::Serialize>("AfterLptPass3.xml", "AfterLptPass3.bin");
     const auto cleanup = manager.register_pass<GraphRewrite>();
     ADD_MATCHER(cleanup, EliminateFakeQuantizeTransformation, params)
     ADD_MATCHER(cleanup, FoldConvertTransformation, params)
@@ -312,7 +306,7 @@ bool LowPrecision::run_on_model(const std::shared_ptr<ov::Model>& m) {
 
     REGISTER_PASS(manager, FoldFakeQuantizeTransformation, params)
     REGISTER_PASS(manager, ConstantFolding)
-
+    manager.register_pass<ov::pass::Serialize>("AfterLptPass4.xml", "AfterLptPass4.bin");
     manager.run_passes(m);
     return false;
 }

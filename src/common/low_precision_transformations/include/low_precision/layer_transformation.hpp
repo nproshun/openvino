@@ -28,6 +28,7 @@ namespace low_precision {
 namespace precision_set {
     LP_TRANSFORMATIONS_API const std::vector<element::Type>& get_int8_support();
     LP_TRANSFORMATIONS_API const std::vector<element::Type>& get_fp8_support();
+    LP_TRANSFORMATIONS_API const std::vector<element::Type>& get_int8_int16_support();
     LP_TRANSFORMATIONS_API const std::vector<element::Type>& get_int8_int16_int32_support();
 } // namespace precision_set
 

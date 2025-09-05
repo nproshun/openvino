@@ -338,7 +338,7 @@ void TransformationsPipeline::apply(std::shared_ptr<ov::Model> func) {
     OV_ITT_SCOPED_TASK(itt::domains::intel_gpu_plugin, "TransformationsPipeline::apply");
     using const_node_ptr = const std::shared_ptr<const ov::Node>;
 
-    const auto& defaultPrecisions = ov::pass::low_precision::precision_set::get_int8_support();
+    const auto& defaultPrecisions = ov::pass::low_precision::precision_set::get_int8_int16_support();
     const ov::element::TypeVector supported_woq_types = {ov::element::u8, ov::element::i8, ov::element::u4, ov::element::i4};
     bool enableInt8;
     ov::element::Type infer_precision = ov::element::dynamic;

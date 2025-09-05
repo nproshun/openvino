@@ -36,6 +36,16 @@ const std::vector<element::Type>& precision_set::get_fp8_support() {
     return fp8_support;
 }
 
+const std::vector<element::Type>& precision_set::get_int8_int16_support() {
+    static const std::vector<element::Type> int8_int16_support = {
+        ov::element::u8,
+        ov::element::i8,
+        ov::element::u16,
+        ov::element::i16,
+    };
+    return int8_int16_support;
+}
+
 const std::vector<element::Type>& precision_set::get_int8_int16_int32_support() {
     static const std::vector<element::Type> int8_int16_int32_support = {
         ov::element::u8,  ov::element::i8,
