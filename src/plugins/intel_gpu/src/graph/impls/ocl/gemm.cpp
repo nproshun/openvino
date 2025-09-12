@@ -335,7 +335,10 @@ attach_gemm_impl::attach_gemm_impl() {
                                         data_types::f32,
                                         data_types::i8,
                                         data_types::u8,
-                                        data_types::i32};
+                                        data_types::i32, 
+                                        data_types::i16, 
+                                        data_types::u16
+    };
 
     const std::vector<format::type> formats {
         format::bfyx,
