@@ -156,6 +156,7 @@ JitConstants KernelBase::MakeFusedOpsJitConstants(const kernel_selector::base_pa
             bool can_all_use_preload = true;
 
             for (size_t i = 0; i < params.fused_ops.size(); i++) {
+                std::string current_fused_ops;
                 // Reorder is not processed by jitter
                 if (params.fused_ops[i].GetType() == FusedOpType::REORDER)
                     continue;
@@ -170,13 +171,18 @@ JitConstants KernelBase::MakeFusedOpsJitConstants(const kernel_selector::base_pa
                 if (params.fused_ops[i].GetType() == FusedOpType::ELTWISE &&
                     c.load_type == FusedOpsConfiguration::LoadType::FEATURE_SHUFFLE)
                     can_preload_eltwise = false;
-                fused_ops += "\\\n\tFUSED_OP" + toCodeString(i) + "_LOAD" + c.suffix;
-                fused_ops += "\\\n\tFUSED_OP" + toCodeString(i) + "_ACTION" + c.suffix;
+                current_fused_ops = "\\\n\tFUSED_OP" + toCodeString(i) + "_LOAD" + c.suffix;
+                current_fused_ops += "\\\n\tFUSED_OP" + toCodeString(i) + "_ACTION" + c.suffix;
+                fused_ops += current_fused_ops;
                 if (can_use_preload && can_preload_eltwise)
                     fused_ops_preload += "\\\n\tFUSED_OP" + toCodeString(i) + "_LOAD" + c.suffix;
                 if (c.allow_for_partial_preload && (!can_use_preload || !can_preload_eltwise))
                     fused_ops_calc += "\\\n\tFUSED_OP" + toCodeString(i) + "_LOAD" + c.suffix;
                 fused_ops_calc += "\\\n\tFUSED_OP" + toCodeString(i) + "_ACTION" + c.suffix;
+                if (params.fused_ops[i].GetType() == FusedOpType::QUANTIZE) {
+                    jit.AddConstant(MakeJitConstant("FUSED_OPS" + toCodeString(i) + c.suffix, current_fused_ops));
+                    jit.AddConstant(MakeJitConstant("FUSED_OPS_RESULT" + toCodeString(i) + c.suffix, out_name));
+                }
             }
 
             jit.AddConstant(MakeJitConstant("FUSED_OPS" + c.suffix, fused_ops));
@@ -210,6 +216,14 @@ JitConstants KernelBase::MakeFusedOpsDeclsJitConstants(const kernel_selector::ba
     for (size_t i = 0; i < params.fused_ops.size(); i++) {
         auto fused_dep_codegen = FusedOpsCodeGenerator(params.fused_ops[i]);
         std::string op_type = fused_dep_codegen.GetTypeStr();
+
+        if (params.fused_ops[i].GetType() == FusedOpType::QUANTIZE) {
+            if (params.fused_ops.size() - 1 == i) {
+                jit.AddConstant(MakeJitConstant("HAS_FUSED_OUTPUT_QUANTIZE", true));
+            } else {
+                jit.AddConstant(MakeJitConstant("HAS_FUSED_INPUT_QUANTIZE", true));
+            }
+        }
 
         jit.Merge(fused_dep_codegen.MakeFusedTensorJitConstants(conf[0]));
         jit.Merge(fused_dep_codegen.MakeInputDeclsJitConstants(conf[0]));

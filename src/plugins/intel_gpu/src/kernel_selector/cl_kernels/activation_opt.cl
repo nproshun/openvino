@@ -20,19 +20,41 @@ KERNEL(activation)(
     typedef CAT(OUTPUT_TYPE, 4) output_t;
 
     input_t v = ((__global input_t*) (input + input_offset))[0];
+ 
+#if HAS_FUSED_INPUT_QUANTIZE
+    #if !CAN_USE_VECTOR
+        for (int i = 0; i < 4; i++) {
+            FUSED_OPS0_SCALAR;
+            v[i] = FUSED_OPS_RESULT0_SCALAR;
+        }
+    #else
+        FUSED_OPS0_VECTOR;
+        v = FUSED_OPS_RESULT0_VECTOR;
+    #endif
+#endif
 
     v = ACTIVATION_KERNEL(v, ACTIVATION_PARAMS_KERNEL);
 
-#if HAS_FUSED_OPS
+#if HAS_FUSED_OUTPUT_QUANTIZE || HAS_FUSED_INPUT_QUANTIZE
     output_t result;
     #if !CAN_USE_VECTOR
         for (int i = 0; i < 4; i++) {
-            FUSED_OPS_SCALAR;
-            result[i] = FUSED_OPS_RESULT_SCALAR;
+            #if HAS_FUSED_OUTPUT_QUANTIZE && HAS_FUSED_INPUT_QUANTIZE
+                FUSED_OPS1_SCALAR;
+                result[i] = FUSED_OPS_RESULT1_SCALAR;
+            #else
+                FUSED_OPS0_SCALAR;
+                result[i] = FUSED_OPS_RESULT0_SCALAR;
+            #endif
         }
     #else
-        FUSED_OPS_VECTOR;
-        result = FUSED_OPS_RESULT_VECTOR;
+        #if HAS_FUSED_OUTPUT_QUANTIZE && HAS_FUSED_INPUT_QUANTIZE
+            FUSED_OPS1_VECTOR;
+            result = FUSED_OPS_RESULT1_VECTOR;
+        #else
+            FUSED_OPS0_VECTOR;
+            result = FUSED_OPS_RESULT0_VECTOR;
+        #endif
     #endif
     *((__global output_t*)(output + output_offset)) = result;
 #else

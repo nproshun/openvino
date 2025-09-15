@@ -223,7 +223,7 @@ public:
     // Fuses two nodes into fused_node and removes peer_node from graph
     void fuse_nodes(program_node& fused_node,
                     program_node& peer_node,
-                    std::map<primitive_id, std::vector<std::pair<primitive_id, size_t>>>* fusing_history);
+                    std::map<primitive_id, std::vector<std::pair<primitive_id, size_t>>>* fusing_history, bool fuse_input = false);
 
     // returns if 'node' has been removed
     bool remove_if_dangling(program_node& node);

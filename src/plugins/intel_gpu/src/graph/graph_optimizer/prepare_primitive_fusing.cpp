@@ -926,6 +926,8 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
 
             should_fuse |= input_data.is_type<activation>() && quantize_node.get_scale_shift_opt();
 
+            should_fuse |= quantize_node.have_user_with_type<activation>() && quantize_node.get_scale_shift_opt();
+
             should_fuse |= input_data.is_type<normalize>() && quantize_node.get_scale_shift_opt() &&
                            in_dt_is_i8_u8;
 
@@ -967,7 +969,11 @@ void prepare_primitive_fusing::fuse_simple_primitives(program &p) {
             if (!should_fuse)
                 return;
 
-            p.fuse_nodes(input_data, quantize_node, &fusing_history);
+            if (quantize_node.have_user_with_type<activation>() && quantize_node.get_scale_shift_opt()){
+                p.fuse_nodes(*quantize_node.get_users().front(), quantize_node, &fusing_history, true);
+            } else {
+                p.fuse_nodes(input_data, quantize_node, &fusing_history);
+            }
         };
 
         auto fuse_eltwise_f = [&](eltwise_node& node) {

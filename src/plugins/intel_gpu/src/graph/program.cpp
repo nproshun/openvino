@@ -1136,7 +1136,8 @@ bool program::move_node(program_node& node,
 
 void program::fuse_nodes(program_node &fused_node,
                          program_node &peer_node,
-                         std::map<primitive_id, std::vector<std::pair<primitive_id, size_t>>>* fusing_history) {
+                         std::map<primitive_id, std::vector<std::pair<primitive_id, size_t>>>* fusing_history,
+                         bool fuse_input) {
     auto peer_layout = peer_node.get_output_layout();
     fused_primitive_desc local_desc(peer_node.get_primitive());
     local_desc.f_param = get_node_ptr(peer_node.id())->get_fuse_params();
@@ -1164,14 +1165,17 @@ void program::fuse_nodes(program_node &fused_node,
     size_t deps_idx = 0;
     for (size_t i = 0; i < peer_node.get_dependencies().size(); i++) {
         auto [dep, port] = peer_node.get_dependency_with_port(i);
-        if (dep->id() == fused_node.id()) {
-            if (fused_node.has_fused_primitives()) {
-                local_desc.inputs.emplace_back(FusedInputType::INTERNAL, fused_node.get_fused_primitives().size() - 1, fused_layout.data_type);
-            } else {
-                local_desc.inputs.emplace_back(FusedInputType::ORIGINAL, 0, fused_layout.data_type);
+        auto& peer_node_id = fuse_input ? peer_node.get_users().front()->id() : dep->id();
+        if (deps_idx == 0) {
+            if (peer_node_id == fused_node.id()) {
+                if (fused_node.has_fused_primitives()) {
+                    local_desc.inputs.emplace_back(FusedInputType::INTERNAL, fused_node.get_fused_primitives().size() - 1, fused_layout.data_type);
+                } else {
+                    local_desc.inputs.emplace_back(FusedInputType::ORIGINAL, 0, fused_layout.data_type);
+                }
+                deps_idx++;
+                continue;
             }
-            deps_idx++;
-            continue;
         }
 
         if (peer_node.is_type<quantize>()) {
@@ -1227,10 +1231,16 @@ void program::fuse_nodes(program_node &fused_node,
         (*fusing_history)[user->id()].push_back(std::make_pair(peer_node.id(), dep_idx));
     }
 
-    // Remove all edges connected with peer node
-    while (peer_node.get_dependencies().size() > 0) {
-        auto& dep = peer_node.get_dependency(peer_node.get_dependencies().size() - 1);
+    auto& cleanup_node = fuse_input ? fused_node : peer_node;
+    while (cleanup_node.get_dependencies().size() > 0) {
+        auto& dep = cleanup_node.get_dependency(cleanup_node.get_dependencies().size() - 1);
+        remove_connection(dep, cleanup_node);
+    }
+    if (fuse_input) {
+        auto& dep = peer_node.get_dependency(0);
+        add_connection(dep, fused_node, 0);
         remove_connection(dep, peer_node);
+        // remove_all_connections(peer_node); //Ideally this needs to be enabled.
     }
     replace_all_usages(peer_node, fused_node);
 
