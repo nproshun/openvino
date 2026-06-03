@@ -74,21 +74,21 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 ov_add_version_defines(pyopenvino.cpp ${PROJECT_NAME})
 
-if(OV_GENERATOR_MULTI_CONFIG)
-    string(APPEND _cmd_echo
-        "$<$<CONFIG:Debug>:"
-            "${CMAKE_COMMAND};-E;cmake_echo_color;--red;\"OpenVINO;Python;API;cannot;be;built;for;'Debug'\""
-        ">")
-    string(APPEND cmd_error
-        "$<$<CONFIG:Debug>:"
-            "${CMAKE_COMMAND};-E;false"
-        ">")
-
-    add_custom_command(TARGET ${PROJECT_NAME} PRE_BUILD
-        COMMAND "${_cmd_echo}"
-        COMMAND "${cmd_error}"
-        COMMAND_EXPAND_LISTS)
-endif()
+#if(OV_GENERATOR_MULTI_CONFIG)
+#    string(APPEND _cmd_echo
+#        "$<$<CONFIG:Debug>:"
+#            "${CMAKE_COMMAND};-E;cmake_echo_color;--red;\"OpenVINO;Python;API;cannot;be;built;for;'Debug'\""
+#        ">")
+#    string(APPEND cmd_error
+#        "$<$<CONFIG:Debug>:"
+#            "${CMAKE_COMMAND};-E;false"
+#        ">")
+#
+#    add_custom_command(TARGET ${PROJECT_NAME} PRE_BUILD
+#        COMMAND "${_cmd_echo}"
+#        COMMAND "${cmd_error}"
+#        COMMAND_EXPAND_LISTS)
+#endif()
 
 # Collect all Python source files for dependency tracking
 file(GLOB_RECURSE OPENVINO_PYTHON_SOURCE_FILES CONFIGURE_DEPENDS ${OpenVINOPython_SOURCE_DIR}/src/openvino/*.py)
