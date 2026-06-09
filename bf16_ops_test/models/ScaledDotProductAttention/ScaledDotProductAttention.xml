@@ -1,0 +1,106 @@
+<?xml version="1.0"?>
+<net name="ScaledDotProductAttention" version="11">
+	<layers>
+		<layer id="0" name="query" type="Parameter" version="opset1">
+			<data shape="1,2,4,8" element_type="bf16" />
+			<output>
+				<port id="0" precision="BF16" names="query">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>4</dim>
+					<dim>8</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="1" name="key" type="Parameter" version="opset1">
+			<data shape="1,2,6,8" element_type="bf16" />
+			<output>
+				<port id="0" precision="BF16" names="key">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>6</dim>
+					<dim>8</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="2" name="value" type="Parameter" version="opset1">
+			<data shape="1,2,6,8" element_type="bf16" />
+			<output>
+				<port id="0" precision="BF16" names="value">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>6</dim>
+					<dim>8</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="3" name="attention_mask" type="Parameter" version="opset1">
+			<data shape="1,2,4,6" element_type="bf16" />
+			<output>
+				<port id="0" precision="BF16" names="attention_mask">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>4</dim>
+					<dim>6</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="4" name="ScaledDotProductAttention_93" type="ScaledDotProductAttention" version="opset13">
+			<data causal="false" />
+			<input>
+				<port id="0" precision="BF16">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>4</dim>
+					<dim>8</dim>
+				</port>
+				<port id="1" precision="BF16">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>6</dim>
+					<dim>8</dim>
+				</port>
+				<port id="2" precision="BF16">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>6</dim>
+					<dim>8</dim>
+				</port>
+				<port id="3" precision="BF16">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>4</dim>
+					<dim>6</dim>
+				</port>
+			</input>
+			<output>
+				<port id="4" precision="BF16" names="Result_94">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>4</dim>
+					<dim>8</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="5" name="Result_94" type="Result" version="opset1" output_names="Result_94">
+			<input>
+				<port id="0" precision="BF16">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>4</dim>
+					<dim>8</dim>
+				</port>
+			</input>
+		</layer>
+	</layers>
+	<edges>
+		<edge from-layer="0" from-port="0" to-layer="4" to-port="0" />
+		<edge from-layer="1" from-port="0" to-layer="4" to-port="1" />
+		<edge from-layer="2" from-port="0" to-layer="4" to-port="2" />
+		<edge from-layer="3" from-port="0" to-layer="4" to-port="3" />
+		<edge from-layer="4" from-port="4" to-layer="5" to-port="0" />
+	</edges>
+	<rt_info>
+		<info name="OpenVINO Runtime" value="2026.3.0-22065-51beed50e54-enable_bf16_ocl" />
+	</rt_info>
+</net>
