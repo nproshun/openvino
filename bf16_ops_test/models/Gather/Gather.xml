@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<net name="Gather" version="11">
+	<layers>
+		<layer id="0" name="data" type="Parameter" version="opset1">
+			<data shape="1,4,4,4" element_type="bf16" />
+			<output>
+				<port id="0" precision="BF16" names="data">
+					<dim>1</dim>
+					<dim>4</dim>
+					<dim>4</dim>
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="1" name="indices" type="Const" version="opset1">
+			<data element_type="i64" shape="2" offset="0" size="16" />
+			<output>
+				<port id="0" precision="I64">
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="2" name="axis" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="16" size="8" />
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="3" name="Gather_34" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="BF16">
+					<dim>1</dim>
+					<dim>4</dim>
+					<dim>4</dim>
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>2</dim>
+				</port>
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="BF16" names="Result_35">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>4</dim>
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="4" name="Result_35" type="Result" version="opset1" output_names="Result_35">
+			<input>
+				<port id="0" precision="BF16">
+					<dim>1</dim>
+					<dim>2</dim>
+					<dim>4</dim>
+					<dim>4</dim>
+				</port>
+			</input>
+		</layer>
+	</layers>
+	<edges>
+		<edge from-layer="0" from-port="0" to-layer="3" to-port="0" />
+		<edge from-layer="1" from-port="0" to-layer="3" to-port="1" />
+		<edge from-layer="2" from-port="0" to-layer="3" to-port="2" />
+		<edge from-layer="3" from-port="3" to-layer="4" to-port="0" />
+	</edges>
+	<rt_info>
+		<info name="OpenVINO Runtime" value="2026.3.0-22065-51beed50e54-enable_bf16_ocl" />
+	</rt_info>
+</net>
