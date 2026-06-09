@@ -73,7 +73,8 @@ JitConstants SelectKernelBase::GetJitConstantsCommon(const select_params& params
             destType = "int";
         // f16, f16, x
         // i16, i16, x
-        } else if (params.inputs[1].GetDType() == Datatype::F16 || params.inputs[1].GetDType() == Datatype::INT16) {
+        } else if (params.inputs[1].GetDType() == Datatype::F16 || params.inputs[1].GetDType() == Datatype::BF16 ||
+                   params.inputs[1].GetDType() == Datatype::INT16) {
             destType = "short";
         // i8, i8, f32
         // i8, i8, f16
