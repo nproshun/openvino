@@ -1,3 +1,6 @@
+# Copyright (C) 2018-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 """Run each BF16 IR model with inference_precision=bf16, compare against f32 JSON reference."""
 
 import json
@@ -118,6 +121,22 @@ def compare_outputs(op_name, ref_outputs, actual_outputs):
                 f"  {key}: {status}  max_abs={max_abs:.6e}  mean_abs={mean_abs:.6e}  "
                 f"max_rel={max_rel:.6e}  shape={list(act_arr.shape)}"
             )
+
+            if not ok:
+                # Show top-5 biggest mismatches by absolute error
+                flat_abs = abs_diff.flatten()
+                flat_ref = ref_f64.flatten()
+                flat_act = act_f64.flatten()
+                n_show = min(5, len(flat_abs))
+                worst_idx = np.argsort(flat_abs)[-n_show:][::-1]
+                details.append(f"    Top {n_show} mismatches (flat index, ref, actual, abs_err, rel_err):")
+                for idx in worst_idx:
+                    nd_idx = np.unravel_index(idx, abs_diff.shape)
+                    details.append(
+                        f"      [{idx}] {nd_idx}  ref={flat_ref[idx]:.8e}  "
+                        f"actual={flat_act[idx]:.8e}  abs={flat_abs[idx]:.8e}  "
+                        f"rel={rel_diff.flatten()[idx]:.8e}"
+                    )
 
     return all_ok, "\n".join(details)
 

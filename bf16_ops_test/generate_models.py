@@ -1,3 +1,6 @@
+# Copyright (C) 2018-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 """Generate minimal OpenVINO IR models (one per op) with BF16 precision."""
 
 import os
