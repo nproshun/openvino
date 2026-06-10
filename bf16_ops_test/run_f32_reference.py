@@ -1,3 +1,6 @@
+# Copyright (C) 2018-2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 """Run each BF16 IR model with inference_precision=f32, save inputs+outputs to JSON."""
 
 import json
