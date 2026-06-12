@@ -17,7 +17,7 @@ namespace ov::intel_gpu::ocl {
 namespace {
 
 ov::element::Type get_accumulator_type(const kernel_impl_params& params) {
-    return params.get_input_layout(0).data_type;
+    return ov::element::Type(params.get_input_layout(0).data_type).get_compute_type();
 }
 
 class SDPARefGenerator : public SDPABase {
