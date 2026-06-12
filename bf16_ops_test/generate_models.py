@@ -42,6 +42,25 @@ def gen_add():
     return ov.Model([node], [d1, d2], "Add")
 
 
+# ── Add + Sigmoid (fusable into Add with Sigmoid post-op) ─────────────────────
+def gen_add_sigmoid():
+    d1 = make_param("data1", [1, 3, 4, 4])
+    d2 = make_param("data2", [1, 3, 4, 4])
+    add = opset.add(d1, d2)
+    node = opset.sigmoid(add)
+    return ov.Model([node], [d1, d2], "AddSigmoid")
+
+
+# ── Add + Multiply (fusable into Add with Multiply post-op) ───────────────────
+def gen_add_multiply():
+    d1 = make_param("data1", [1, 3, 4, 4])
+    d2 = make_param("data2", [1, 3, 4, 4])
+    d3 = make_param("data3", [1, 3, 4, 4])
+    add = opset.add(d1, d2)
+    node = opset.multiply(add, d3)
+    return ov.Model([node], [d1, d2, d3], "AddMultiply")
+
+
 # ── Clamp ────────────────────────────────────────────────────────────────────
 def gen_clamp():
     d = make_param("data", [1, 3, 4, 4])
@@ -205,6 +224,8 @@ def gen_variadic_split():
 # ── Main ─────────────────────────────────────────────────────────────────────
 GENERATORS = {
     "Add":                          gen_add,
+    "AddSigmoid":                   gen_add_sigmoid,
+    "AddMultiply":                  gen_add_multiply,
     "Clamp":                        gen_clamp,
     "Concat":                       gen_concat,
     "Divide":                       gen_divide,
