@@ -167,6 +167,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
     std::string compute_type;
     std::string to_compute_type;
     std::string decode_compute_type;
+    std::string decode_vector_compute_type;
     bool is_fp = false;
     switch (value) {
     case ov::element::i8:
@@ -310,6 +311,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         compute_type = "float";
         to_compute_type = "convert_float(v)";
         decode_compute_type = "_convert_as_bfloat16_float(v)";
+        decode_vector_compute_type = "CONVERT_AS_BFLOAT16_FLOAT(v, size)";
         type_size = "2";
         is_fp = false;
         break;
@@ -353,6 +355,8 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_compute_type = to_type;
     if (decode_compute_type.empty())
         decode_compute_type = "(v)";
+    if (decode_vector_compute_type.empty())
+        decode_vector_compute_type = "(v)";
 
     return {
         make_jit_constant(name + "_TYPE", type),
@@ -371,6 +375,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         make_jit_constant(name + "_COMPUTE_TYPE", compute_type),
         make_jit_constant("TO_" + name + "_COMPUTE_TYPE(v)", to_compute_type),
         make_jit_constant("DECODE_" + name + "_COMPUTE_TYPE(v)", decode_compute_type),
+        make_jit_constant("DECODE_VECTOR_" + name + "_COMPUTE_TYPE(v, size)", decode_vector_compute_type),
     };
 }
 

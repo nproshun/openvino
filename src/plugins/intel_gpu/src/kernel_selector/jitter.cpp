@@ -1457,6 +1457,7 @@ JitConstants MakeTypeJitConstants(Datatype dataType, const std::string& macroNam
     std::string compute_type;
     std::string to_compute_type;
     std::string decode_compute_type;
+    std::string decode_vector_compute_type;
     bool is_fp;
     switch (dataType) {
         case Datatype::INT8:
@@ -1604,6 +1605,7 @@ JitConstants MakeTypeJitConstants(Datatype dataType, const std::string& macroNam
             compute_type = "float";
             to_compute_type = "convert_float(v)";
             decode_compute_type = "_convert_as_bfloat16_float(v)";
+            decode_vector_compute_type = "CONVERT_AS_BFLOAT16_FLOAT(v, size)";
             type_size = "2";
             is_fp = false;
             break;
@@ -1630,6 +1632,8 @@ JitConstants MakeTypeJitConstants(Datatype dataType, const std::string& macroNam
         to_compute_type = to_type;
     if (decode_compute_type.empty())
         decode_compute_type = "(v)";
+    if (decode_vector_compute_type.empty())
+        decode_vector_compute_type = "(v)";
 
     return JitConstants{
         MakeJitConstant(macroName + "_TYPE", type),
@@ -1648,6 +1652,7 @@ JitConstants MakeTypeJitConstants(Datatype dataType, const std::string& macroNam
         MakeJitConstant(macroName + "_COMPUTE_TYPE", compute_type),
         MakeJitConstant("TO_" + macroName + "_COMPUTE_TYPE(v)", to_compute_type),
         MakeJitConstant("DECODE_" + macroName + "_COMPUTE_TYPE(v)", decode_compute_type),
+        MakeJitConstant("DECODE_VECTOR_" + macroName + "_COMPUTE_TYPE(v, size)", decode_vector_compute_type),
     };
 }
 JitConstants MakeTypeJitConstants(WeightsType weightsType, const std::string& macroName) {
@@ -1911,13 +1916,13 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
     std::vector<std::string> input_vars;
 
     out_var = GetOutputVarName(in_var, desc.op_id);
-    const auto& out_type = desc.output_tensor.GetDType();
+    const auto& out_type = GetComputeDatatype(desc.output_tensor.GetDType());
 
     if (conf.load_type == FusedOpsConfiguration::LoadType::FEATURE_SHUFFLE &&
         desc.GetType() == KernelType::QUANTIZE) {
         is_shuffled = true;
     }
-
+    // TODO: Remove this unused block
     std::vector<std::string> in_vars_converted;
     for (size_t i = 0; i < desc.tensors.size(); i++) {
         auto in_name = GetInputVarName(i, is_shuffled, shuffle_var);
@@ -2184,7 +2189,8 @@ std::string FusedOpsCodeGenerator::GetOutputTensorName() const {
 std::string FusedOpsCodeGenerator::GetInputTypeName(size_t input_id, size_t vec_size) const {
     if (vec_size == 0 || vec_size > 8)
         throw std::invalid_argument("Invalid vector size in jit definitions: " + std::to_string(vec_size));
-    std::string scalar_type = GetInputTensorName(input_id) + "_TYPE";
+    // Use COMPUTE_TYPE to decode bf16 on load
+    std::string scalar_type = GetInputTensorName(input_id) + "_COMPUTE_TYPE";
     if (vec_size > 1)
         return "MAKE_VECTOR_TYPE(" + scalar_type + "," + toCodeString(vec_size) + ")";
     else
@@ -2218,7 +2224,7 @@ std::string FusedOpsCodeGenerator::GetJitLoad(const FusedOpsConfiguration& conf,
     auto& input_tensor = desc.tensors[input_id];
     size_t vec_size = 1;
     auto input_dt = input_tensor.GetDType();
-
+    auto decode_input_compute_dt = "DECODE_VECTOR_" + GetInputTypeName(input_id, 1);
     bool valid_broadcast_case = input_tensor.LogicalSize() == prim_output.Feature().v ||
                                 input_tensor.LogicalSize() == 1;
 
@@ -2270,10 +2276,11 @@ std::string FusedOpsCodeGenerator::GetJitLoad(const FusedOpsConfiguration& conf,
         if (vec_size > 1) {
             std::string load_str = "0;"; // Assign zero to initial variable (GetInputVarName(input_id)) and modify it in the loop below
             load_str += "for (uint loop_var = 0; loop_var < " + std::to_string(vec_size)  + "; loop_var++) { ";
-            load_str += GetInputVarName(input_id) + "[loop_var] = " + GetInputPtrName(input_id) + "[" + new_index_func_call + "]; }";
+            load_str +=
+                GetInputVarName(input_id) + "[loop_var] = " + decode_input_compute_dt + "(" + GetInputPtrName(input_id) + "[" + new_index_func_call + "], 1); }";
             return load_str;
         } else {
-            return GetInputPtrName(input_id) + "[" + new_index_func_call + "]";
+            return decode_input_compute_dt + "(" + GetInputPtrName(input_id) + "[" + new_index_func_call + "], 1)";
         }
     }
 
@@ -2284,10 +2291,10 @@ std::string FusedOpsCodeGenerator::GetJitLoad(const FusedOpsConfiguration& conf,
         if (safe_load)
             offset = "(" + offset + " % " + toCodeString(input_tensor.LogicalSize()) + ")";
         if (vec_size > 1)
-            return "((const __global " + toCLType(input_dt) + toCodeString(vec_size) + "*)(" +
-                   GetInputPtrName(input_id) + " + " + offset + "))[0]";
+            return decode_input_compute_dt + "(((const __global " + toCLType(input_dt) + toCodeString(vec_size) + "*)(" + GetInputPtrName(input_id) + " + " +
+                   offset + "))[0], " + toCodeString(vec_size) + ")";
         else
-            return GetInputPtrName(input_id) + "[" + offset + "]";
+            return decode_input_compute_dt + "(" + GetInputPtrName(input_id) + "[" + offset + "], 1)";
     } else {
         // TODO: Need to add smarter vectors handling:
         // 1. Boundary checks for safe load
@@ -2301,10 +2308,11 @@ std::string FusedOpsCodeGenerator::GetJitLoad(const FusedOpsConfiguration& conf,
                 block_read = CastToType(" _sub_group_block_read" + vs + "("
                                         + "(const __global uint*)(" + GetInputPtrName(input_id) + " + " + index_func_call_vec + "))",
                                         input_dt, vec_size);
-            } else if (input_dt == Datatype::F16) {
+            } else if (input_dt == Datatype::F16 || input_dt == Datatype::BF16) {
                 block_read = CastToType(" _sub_group_block_read_us" + vs + "("
                                         + "(const __global ushort*)(" + GetInputPtrName(input_id) + " + " + index_func_call_vec + "))",
-                                        input_dt, vec_size);
+                                        input_dt,
+                                        vec_size);
             } else if (input_dt == Datatype::UINT8 || input_dt == Datatype::INT8) {
                 block_read = CastToType(" _sub_group_block_read_uc" + vs + "("
                                         + "(const __global uchar*)(" + GetInputPtrName(input_id) + " + " + index_func_call_vec + "))",
@@ -2314,7 +2322,7 @@ std::string FusedOpsCodeGenerator::GetJitLoad(const FusedOpsConfiguration& conf,
             }
 
             if (vec_size > 1) {
-                return block_read;
+                return decode_input_compute_dt + "(" + block_read + ", " + toCodeString(vec_size) + ")";
             }
 
             bool multiple_elements = false;
@@ -2331,17 +2339,18 @@ std::string FusedOpsCodeGenerator::GetJitLoad(const FusedOpsConfiguration& conf,
 
             if (input_tensor.LogicalSize() > 1 || multiple_elements) {
                 // Currently we assume that in such scenario we can safely load sub_group_size elements from the pointer
-                return Broadcast(block_read, input_dt, vec_size);
+                return decode_input_compute_dt + "(" + Broadcast(block_read, input_dt, vec_size) + ", " + toCodeString(vec_size) + ")";
             } else {
                 // Input has only one element, so broadcast it for the whole vector size
-                return Broadcast(GetInputPtrName(input_id) + "[" + index_func_call + "]", input_dt, vec_size);
+                return decode_input_compute_dt + "(" + Broadcast(GetInputPtrName(input_id) + "[" + index_func_call + "]", input_dt, vec_size) + ", " +
+                       toCodeString(vec_size) + ")";
             }
         } else {
             if (vec_size > 1) {
-                return "((const __global " + toCLType(input_dt) + toCodeString(vec_size) + "*)(" +
-                       GetInputPtrName(input_id) + " + " + index_func_call_vec + "))[0]";
+                return decode_input_compute_dt + "(((const __global " + toCLType(input_dt) + toCodeString(vec_size) + "*)(" + GetInputPtrName(input_id) +
+                       " + " + index_func_call_vec + "))[0], " + toCodeString(vec_size) + ")";
             } else {
-                return GetInputPtrName(input_id) + "[" + index_func_call + "]";
+                return decode_input_compute_dt + "(" + GetInputPtrName(input_id) + "[" + index_func_call + "]" + ", " + toCodeString(vec_size) + ")";
             }
         }
     }
@@ -2377,6 +2386,10 @@ std::string FusedOpsCodeGenerator::GetOutputType(size_t vec_size) const {
     return GetType(desc.output_tensor.GetDType(), vec_size);
 }
 
+std::string FusedOpsCodeGenerator::GetOutputComputeType(size_t vec_size) const {
+    return GetType(GetComputeDatatype(desc.output_tensor.GetDType()), vec_size);
+}
+
 std::string FusedOpsCodeGenerator::ConvertToType(std::string var, Datatype dt, size_t vec_size) const {
     return "convert_" + GetType(dt, vec_size) + "(" + var + ")";
 }
@@ -2387,6 +2400,10 @@ std::string FusedOpsCodeGenerator::CastToType(std::string var, Datatype dt, size
 
 std::string FusedOpsCodeGenerator::ConvertToOutputType(std::string var, size_t vec_size) const {
     return ConvertToType(var, desc.output_tensor.GetDType(), vec_size);
+}
+
+std::string FusedOpsCodeGenerator::ConvertToOutputComputeType(std::string var, size_t vec_size) const {
+    return ConvertToType(var, GetComputeDatatype(desc.output_tensor.GetDType()), vec_size);
 }
 
 std::string FusedOpsCodeGenerator::Broadcast(std::string var, Datatype dt, size_t vec_size) const {
