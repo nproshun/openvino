@@ -1916,7 +1916,7 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
     std::vector<std::string> input_vars;
 
     out_var = GetOutputVarName(in_var, desc.op_id);
-    const auto& out_type = GetComputeDatatype(desc.output_tensor.GetDType());
+    const auto& out_compute_type = GetComputeDatatype(desc.output_tensor.GetDType());
 
     if (conf.load_type == FusedOpsConfiguration::LoadType::FEATURE_SHUFFLE &&
         desc.GetType() == KernelType::QUANTIZE) {
@@ -1979,7 +1979,7 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
         auto input_name = (dep.dep_type == kernel_selector::DepType::ORIGINAL)? in_var :
                             (dep.dep_type == kernel_selector::DepType::INTERNAL)? GetOutputVarName(in_var, dep.op_id)
                                 : GetInputVarName(dep.op_id, is_shuffled, shuffle_var);
-        auto input_type = (dep.dep_type == kernel_selector::DepType::ORIGINAL)? in_type : dep.data_type;
+        auto input_type = GetComputeDatatype((dep.dep_type == kernel_selector::DepType::ORIGINAL)? in_type : dep.data_type);
         auto acc_t = get_acc_t();
 
         if (input_type != acc_t)
@@ -2021,7 +2021,7 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
                 op_decls += "\\\n\t" + acc_t_type + " " + tmp_var_rem + " = " + input_vars[0] + " % " + input_vars[1] + ";";
                 op_decls += "\\\n\t" + tmp_var + " -= " + "((" + tmp_var_rem + " != 0 && (" + input_vars[0] + " < 0) != (" + input_vars[1] + " < 0)) ? 1 : 0);";
             }
-            op_decls += "\\\n\t" + GetOutputType(vec_size) + " " + out_var + " = " + ConvertToOutputType(tmp_var, vec_size) + ";";
+            op_decls += "\\\n\t" + GetOutputComputeType(vec_size) + " " + out_var + " = " + ConvertToOutputComputeType(tmp_var, vec_size) + ";";
             break;
         }
         case KernelType::QUANTIZE: {
@@ -2030,7 +2030,7 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
                 throw std::runtime_error("[clDNN] Quantize fuse params can't be nullptr");
 
             std::string in_converted = (first_fused_ops_idx < 0) ? in_var : GetOutputVarName(in_var, dep_data[first_fused_ops_idx].op_id);
-            Datatype input_type = (first_fused_ops_idx < 0) ? in_type : dep_data[first_fused_ops_idx].data_type;
+            Datatype input_type = GetComputeDatatype((first_fused_ops_idx < 0) ? in_type : dep_data[first_fused_ops_idx].data_type);
             Datatype tmp_type = Datatype::F32;
             std::string tmp_type_str = GetType(tmp_type, vec_size);
             std::string tmp_var = out_var + "_tmp";
@@ -2084,7 +2084,7 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
                 }
 
                 // Output conversion with rounding and saturation
-                op_decls += "\\\n\t" + GetOutputType(vec_size) + " " + out_var + " = " + ConvertToOutputTypeSat(tmp_var, vec_size) + ";";
+                op_decls += "\\\n\t" + GetOutputComputeType(vec_size) + " " + out_var + " = " + ConvertToOutputTypeSat(tmp_var, vec_size) + ";";
                 break;
             } else {
                 // Input range
@@ -2126,7 +2126,7 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
                     op_decls += "\\\n\t" + tmp_var + " = (" + tmp_var + " + " + post_shift + ");";
 
                 // Output conversion with rounding and saturation
-                op_decls += "\\\n\t" + GetOutputType(vec_size) + " " + out_var + " = " + ConvertToOutputTypeSat(tmp_var, vec_size) + ";";
+                op_decls += "\\\n\t" + GetOutputComputeType(vec_size) + " " + out_var + " = " + ConvertToOutputTypeSat(tmp_var, vec_size) + ";";
                 break;
             }
         }
@@ -2134,37 +2134,37 @@ JitConstants FusedOpsCodeGenerator::MakeOpJitConstants(const FusedOpsConfigurati
             auto p = desc.GetOpParams<activation_fuse_params>();
             base_activation_params activation_p = p->param;
             std::string new_in_var = (first_fused_ops_idx < 0) ? in_var : GetOutputVarName(in_var, dep_data[first_fused_ops_idx].op_id);
-            op_decls += "\\\n\t" + GetOutputType(vec_size) + " " + out_var + " = " + ConvertToOutputType(new_in_var, vec_size) + ";";
+            op_decls += "\\\n\t" + GetOutputComputeType(vec_size) + " " + out_var + " = " + ConvertToOutputComputeType(new_in_var, vec_size) + ";";
             if (activation_p.function != ActivationFunction::NONE) {
                 auto suffix = "_FUSED_OP"+toCodeString(desc.op_id) + conf.suffix;
                 std::string nl_m = toCodeString(activation_p.m);
                 std::string nl_n = toCodeString(activation_p.n);
 
                 if (activation_p.function == ActivationFunction::CLAMP) {
-                    if (out_type == Datatype::INT8) {
+                    if (out_compute_type == Datatype::INT8) {
                         nl_m = toCodeString(std::max<float>(activation_p.m, std::numeric_limits<signed char>::min()));
                         nl_n = toCodeString(std::min<float>(activation_p.n, std::numeric_limits<signed char>::max()));
-                    } else if (out_type == Datatype::UINT8) {
+                    } else if (out_compute_type == Datatype::UINT8) {
                         nl_m = toCodeString(std::max(activation_p.m, 0.0f));
                         nl_n = toCodeString(std::min<float>(activation_p.n, std::numeric_limits<unsigned char>::max()));
                     }
                 }
 
                 if (desc.tensors.size() == 1) {
-                    if (desc.tensors[0].GetDType() != out_type) {
-                        nl_m = ConvertToOutputType(GetInputVarName(0), vec_size);
+                    if (desc.tensors[0].GetDType() != out_compute_type) {
+                        nl_m = ConvertToOutputComputeType(GetInputVarName(0), vec_size);
                     } else {
                         nl_m = GetInputVarName(0);
                     }
                 } else {
-                    nl_m = Broadcast(nl_m, out_type, vec_size);
+                    nl_m = Broadcast(nl_m, out_compute_type, vec_size);
                 }
 
-                nl_n = Broadcast(nl_n, out_type, vec_size);
+                nl_n = Broadcast(nl_n, out_compute_type, vec_size);
 
                 // Disable type casts in activation, since current jit generator for activation don't respect vector size of parameters.
                 // So conversion is explicitly done in params declaration
-                jit.Merge(MakeActivationJitConstants(activation_p.function, out_type, suffix, false, true));
+                jit.Merge(MakeActivationJitConstants(activation_p.function, out_compute_type, suffix, false, true));
                 std::string params = nl_m + ","+ nl_n;
                 op_decls += "\\\n\t" + out_var + " = ACTIVATION_FUNC" + suffix + "(" + out_var + ", " + params + ");";
             }
@@ -2413,6 +2413,8 @@ std::string FusedOpsCodeGenerator::Broadcast(std::string var, Datatype dt, size_
 std::string FusedOpsCodeGenerator::ConvertToOutputTypeSat(std::string var, size_t vec_size) const {
     if (desc.output_tensor.GetDType() == Datatype::F32 || desc.output_tensor.GetDType() == Datatype::F16)
         return "convert_" + GetOutputType(vec_size) + "(" + var + ")";
+    else if (desc.output_tensor.GetDType() == Datatype::BF16)
+        return ConvertToOutputComputeType(var, vec_size);
     else
         return "convert_" + GetOutputType(vec_size) + "_sat_rte(" + var + ")";
 }
