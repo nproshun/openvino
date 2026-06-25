@@ -169,6 +169,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
     std::string decode_compute_type;
     std::string decode_compute_vector_type;
     std::string to_vector_type = "dynamic";
+    std::string to_vector_type_sat = "dynamic";
     bool is_fp = false;
     switch (value) {
     case ov::element::i8:
@@ -180,6 +181,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "convert_char(v)";
         to_type_sat = "convert_char_sat(v)";
         to_vector_type = "CAT(convert_, MAKE_VECTOR_TYPE(char, size))(v)";
+        to_vector_type_sat = "CAT(CAT(convert_, MAKE_VECTOR_TYPE(char, size)), _sat)(v)";
         as_type = "as_char(v)";
         max_func = "max";
         min_func = "min";
@@ -196,6 +198,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "convert_uchar(v)";
         to_type_sat = "convert_uchar_sat(v)";
         to_vector_type = "CAT(convert_, MAKE_VECTOR_TYPE(uchar, size))(v)";
+        to_vector_type_sat = "CAT(CAT(convert_, MAKE_VECTOR_TYPE(uchar, size)), _sat)(v)";
         as_type = "as_uchar(v)";
         max_func = "max";
         min_func = "min";
@@ -212,6 +215,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "convert_short(v)";
         to_type_sat = "convert_short_sat(v)";
         to_vector_type = "CAT(convert_, MAKE_VECTOR_TYPE(short, size))(v)";
+        to_vector_type_sat = "CAT(CAT(convert_, MAKE_VECTOR_TYPE(short, size)), _sat)(v)";
         as_type = "as_short(v)";
         max_func = "max";
         min_func = "min";
@@ -228,6 +232,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "convert_ushort(v)";
         to_type_sat = "convert_ushort_sat(v)";
         to_vector_type = "CAT(convert_, MAKE_VECTOR_TYPE(ushort, size))(v)";
+        to_vector_type_sat = "CAT(CAT(convert_, MAKE_VECTOR_TYPE(ushort, size)), _sat)(v)";
         as_type = "as_ushort(v)";
         max_func = "max";
         min_func = "min";
@@ -244,6 +249,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "convert_int(v)";
         to_type_sat = "convert_int_sat(v)";
         to_vector_type = "CAT(convert_, MAKE_VECTOR_TYPE(int, size))(v)";
+        to_vector_type_sat = "CAT(CAT(convert_, MAKE_VECTOR_TYPE(int, size)), _sat)(v)";
         as_type = "as_int(v)";
         max_func = "max";
         min_func = "min";
@@ -260,6 +266,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "convert_uint(v)";
         to_type_sat = "convert_uint_sat(v)";
         to_vector_type = "CAT(convert_, MAKE_VECTOR_TYPE(uint, size))(v)";
+        to_vector_type_sat = "CAT(CAT(convert_, MAKE_VECTOR_TYPE(uint, size)), _sat)(v)";
         as_type = "as_uint(v)";
         max_func = "max";
         min_func = "min";
@@ -276,6 +283,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "convert_long(v)";
         to_type_sat = "convert_long_sat(v)";
         to_vector_type = "CAT(convert_, MAKE_VECTOR_TYPE(long, size))(v)";
+        to_vector_type_sat = "CAT(CAT(convert_, MAKE_VECTOR_TYPE(long, size)), _sat)(v)";
         as_type = "as_long(v)";
         max_func = "max";
         min_func = "min";
@@ -292,6 +300,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "convert_half(v)";
         to_type_sat = "convert_half(v)";
         to_vector_type = "CAT(convert_, MAKE_VECTOR_TYPE(half, size))(v)";
+        to_vector_type_sat = "CAT(convert_, MAKE_VECTOR_TYPE(half, size))(v)";
         as_type = "as_half(v)";
         max_func = "fmax";
         min_func = "fmin";
@@ -318,12 +327,13 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "_convert_bfloat16_as_ushort(v)";
         to_type_sat = "_convert_bfloat16_as_ushort(v)";
         to_vector_type = "CONVERT_BFLOAT16_AS_USHORT(v, size)";
+        to_vector_type_sat = "CONVERT_BFLOAT16_AS_USHORT(v, size)";
         compute_type = "float";
         to_compute_type = "convert_float(v)";
         decode_compute_type = "_convert_as_bfloat16_float(v)";
         decode_compute_vector_type = "CONVERT_AS_BFLOAT16_FLOAT(v, size)";
         type_size = "2";
-        is_fp = false;
+        is_fp = true;
         break;
     case ov::element::f32:
         type = "float";
@@ -334,6 +344,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "convert_float(v)";
         to_type_sat = "convert_float(v)";
         to_vector_type = "CAT(convert_, MAKE_VECTOR_TYPE(float, size))(v)";
+        to_vector_type_sat = "CAT(convert_, MAKE_VECTOR_TYPE(float, size))(v)";
         as_type = "as_float(v)";
         max_func = "fmax";
         min_func = "fmin";
@@ -350,6 +361,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         to_type = "convert_uchar(v)";
         to_type_sat = "convert_uchar_sat(v)";
         to_vector_type = "CAT(convert_, MAKE_VECTOR_TYPE(uchar, size))(v)";
+        to_vector_type_sat = "CAT(CAT(convert_, MAKE_VECTOR_TYPE(uchar, size)), _sat)(v)";
         as_type = "as_uchar(v)";
         max_func = "max";
         min_func = "min";
@@ -379,6 +391,7 @@ JitConstants make_type_jit_constants(const std::string& name, const ov::element:
         make_jit_constant("TO_" + name + "_TYPE(v)", to_type),
         make_jit_constant("TO_" + name + "_TYPE_SAT(v)", to_type_sat),
         make_jit_constant("TO_" + name + "_VECTOR_TYPE(v, size)", to_vector_type),
+        make_jit_constant("TO_" + name + "_VECTOR_TYPE_SAT(v, size)", to_vector_type_sat),
         make_jit_constant("AS_" + name + "_TYPE(v)", as_type),
         make_jit_constant(name + "_MAX_FUNC", max_func),
         make_jit_constant(name + "_MIN_FUNC", min_func),
