@@ -3,6 +3,7 @@
 //
 
 #include "include/batch_headers/fetch_data.cl"
+#include "include/batch_headers/bf16_utils.cl"
 
 // query_input   [batch, heads_num, q_len, head_size]
 // key_input     [batch, kv_heads_num, kv_len, head_size]
@@ -165,18 +166,18 @@ KERNEL(sdpa_ref)(
     const uint head_size_idx = get_global_id(2);
 
 #if HAS_SCALE_INPUT
-    const OUTPUT_TYPE scale_val = *scale;
+    const OUTPUT_COMPUTE_TYPE scale_val = TO_OUTPUT_COMPUTE_TYPE(*scale);
 #elif defined(STATIC_SCALE_VALUE)
-    const OUTPUT_TYPE scale_val = TO_OUTPUT_TYPE(STATIC_SCALE_VALUE);
+    const OUTPUT_COMPUTE_TYPE scale_val = TO_OUTPUT_COMPUTE_TYPE(STATIC_SCALE_VALUE);
 #else
-    const OUTPUT_TYPE scale_val = OUTPUT_VAL_ONE / sqrt(TO_OUTPUT_TYPE(INPUT1_SIZE_X));
+    const OUTPUT_COMPUTE_TYPE scale_val = OUTPUT_VAL_ONE / sqrt(TO_OUTPUT_COMPUTE_TYPE(INPUT1_SIZE_X));
 #endif
 
     // Process 1*seq_len elements (Gemm1 + SoftMax) using a single work item, saving results to tmp_buf and
     // reusing them between all work items within a single workgroup for Gemm2 calculations.
     if (get_local_id(2) == 0) {
         for (uint s = 0; s < SOURCE_SEQ_LEN /* seq_len */; s++) {
-            OUTPUT_TYPE acc = 0;
+            OUTPUT_COMPUTE_TYPE acc = 0;
             for (uint h = 0; h < HEAD_SIZE /* head_size */; h++) {
                 uint query_offset = FUNC_CALL(get_input0_index)(OPTIONAL_SHAPE_INFO_TENSOR b0, b1, 0, 0, target_seq_idx, h);
 #ifdef BEAM_TABLE_TYPE
@@ -187,12 +188,12 @@ KERNEL(sdpa_ref)(
                 uint key_offset = FUNC_CALL(get_input1_index)(OPTIONAL_SHAPE_INFO_TENSOR b_idx, b1, 0, 0, s, h);
 
 #if APPLY_SCALE_TO_QUERY
-                INPUT0_TYPE q_val = query_input[query_offset] * scale_val;
+                INPUT0_COMPUTE_TYPE q_val = DECODE_INPUT0_COMPUTE_TYPE(query_input[query_offset]) * scale_val;
 #else
-                INPUT0_TYPE q_val = query_input[query_offset];
+                INPUT0_COMPUTE_TYPE q_val = DECODE_INPUT0_COMPUTE_TYPE(query_input[query_offset]);
 #endif
 
-                INPUT1_TYPE k_val_packed = key_input[key_offset];
+                INPUT1_COMPUTE_TYPE k_val_packed = DECODE_INPUT1_COMPUTE_TYPE(key_input[key_offset]);
 #if IS_KV_COMPRESSED
                 const uint comp_offset = GET_COMPRESSION_INDEX(KEY_COMPRESSION_SCALE, b_idx, b1 / BROADCAST_GROUP_SIZE, s, 0);
                 KEY_COMPRESSION_SCALE_TYPE comp_scale = key_scale[comp_offset];
@@ -207,7 +208,7 @@ KERNEL(sdpa_ref)(
                 KEY_COMPRESSION_SCALE_TYPE k_val = ((k_val_packed - comp_zp) * comp_scale);
 
 #else
-                INPUT1_TYPE k_val = k_val_packed;
+                INPUT1_COMPUTE_TYPE k_val = k_val_packed;
 #endif
                 acc += q_val * k_val;
             }
@@ -219,7 +220,7 @@ KERNEL(sdpa_ref)(
             uint tmp_buf_offset = b0 * (NUM_HEADS * TARGET_SEQ_LEN * SOURCE_SEQ_LEN) +
                                   b1 * (TARGET_SEQ_LEN * SOURCE_SEQ_LEN) +
                                   target_seq_idx * (SOURCE_SEQ_LEN) + s;
-            tmp_buf[tmp_buf_offset] = acc;
+            tmp_buf[tmp_buf_offset] = TO_OUTPUT_TYPE(acc);
         }
 
         ACCUMULATOR_TYPE qk_max = ACCUMULATOR_VAL_MIN;
@@ -228,18 +229,18 @@ KERNEL(sdpa_ref)(
                                   b1 * (TARGET_SEQ_LEN * SOURCE_SEQ_LEN) +
                                   target_seq_idx * (SOURCE_SEQ_LEN) + s;
 #if IS_CAUSAL
-            OUTPUT_TYPE attn_mask_val = s > target_seq_idx ? OUTPUT_VAL_MIN : 0;
+            OUTPUT_COMPUTE_TYPE attn_mask_val = s > target_seq_idx ? OUTPUT_VAL_MIN : 0;
 #elif !IS_CAUSAL && HAS_ATTN_MASK_INPUT
             uint attn_mask_offset = INPUT3_GET_INDEX_SAFE(b0, b1, target_seq_idx, s);
-            OUTPUT_TYPE attn_mask_val = attn_mask[attn_mask_offset];
+            OUTPUT_COMPUTE_TYPE attn_mask_val = TO_OUTPUT_COMPUTE_TYPE(DECODE_INPUT3_COMPUTE_TYPE(attn_mask[attn_mask_offset]));
 #elif defined(STATIC_SCALAR_ATTN_MASK_VALUE)
-            OUTPUT_TYPE attn_mask_val = TO_OUTPUT_TYPE(STATIC_SCALAR_ATTN_MASK_VALUE);
+            OUTPUT_COMPUTE_TYPE attn_mask_val = TO_OUTPUT_COMPUTE_TYPE(STATIC_SCALAR_ATTN_MASK_VALUE);
 #else
-            OUTPUT_TYPE attn_mask_val = OUTPUT_VAL_ZERO;
+            OUTPUT_COMPUTE_TYPE attn_mask_val = OUTPUT_VAL_ZERO;
 #endif
 
-            OUTPUT_TYPE qk_val = tmp_buf[tmp_buf_offset] + attn_mask_val;
-            tmp_buf[tmp_buf_offset] = qk_val;
+            OUTPUT_COMPUTE_TYPE qk_val = DECODE_OUTPUT_COMPUTE_TYPE(tmp_buf[tmp_buf_offset]) + attn_mask_val;
+            tmp_buf[tmp_buf_offset] = TO_OUTPUT_TYPE(qk_val);
 
             qk_max = ACCUMULATOR_MAX_FUNC(qk_max, TO_ACCUMULATOR_TYPE(qk_val));
             #ifdef HAS_SINK_INPUT
@@ -253,7 +254,7 @@ KERNEL(sdpa_ref)(
                                   b1 * (TARGET_SEQ_LEN * SOURCE_SEQ_LEN) +
                                   target_seq_idx * (SOURCE_SEQ_LEN) + s;
 
-            OUTPUT_TYPE qk_val = tmp_buf[tmp_buf_offset];
+            OUTPUT_COMPUTE_TYPE qk_val = DECODE_OUTPUT_COMPUTE_TYPE(tmp_buf[tmp_buf_offset]);
             ACCUMULATOR_TYPE val = native_exp(TO_ACCUMULATOR_TYPE(qk_val) - qk_max);
             exp_sum += val;
 
@@ -270,7 +271,7 @@ KERNEL(sdpa_ref)(
                                   b1 * (TARGET_SEQ_LEN * SOURCE_SEQ_LEN) +
                                   target_seq_idx * (SOURCE_SEQ_LEN) + s;
 
-            OUTPUT_TYPE qk_val = tmp_buf[tmp_buf_offset];
+            OUTPUT_COMPUTE_TYPE qk_val = DECODE_OUTPUT_COMPUTE_TYPE(tmp_buf[tmp_buf_offset]);
             ACCUMULATOR_TYPE val = TO_ACCUMULATOR_TYPE(qk_val) * inv_sum;
             tmp_buf[tmp_buf_offset] = TO_OUTPUT_TYPE(val);
         }
@@ -278,7 +279,7 @@ KERNEL(sdpa_ref)(
 
     barrier(CLK_GLOBAL_MEM_FENCE);
 
-    OUTPUT_TYPE acc = 0;
+    OUTPUT_COMPUTE_TYPE acc = 0;
     for (uint s = 0; s < SOURCE_SEQ_LEN /* seq_len */; s++) {
         uint tmp_buf_offset = b0 * (NUM_HEADS * TARGET_SEQ_LEN * SOURCE_SEQ_LEN) +
                               b1 * (TARGET_SEQ_LEN * SOURCE_SEQ_LEN) +
@@ -291,7 +292,7 @@ KERNEL(sdpa_ref)(
 #endif
         uint value_offset = FUNC_CALL(get_input2_index)(OPTIONAL_SHAPE_INFO_TENSOR b_idx, b1, 0, 0, s, head_size_idx);
 
-        const INPUT2_TYPE value_packed = value_input[value_offset];
+        const INPUT2_COMPUTE_TYPE value_packed = DECODE_INPUT2_COMPUTE_TYPE(value_input[value_offset]);
 #if IS_KV_COMPRESSED
         const uint comp_offset = GET_COMPRESSION_INDEX(VALUE_COMPRESSION_SCALE, b_idx, b1 / BROADCAST_GROUP_SIZE, s, 0);
         VALUE_COMPRESSION_SCALE_TYPE comp_scale = val_scale[comp_offset];
@@ -305,12 +306,12 @@ KERNEL(sdpa_ref)(
 #endif
         VALUE_COMPRESSION_SCALE_TYPE value = ((value_packed - comp_zp) * comp_scale);
 #else
-        INPUT2_TYPE value = value_packed;
+        INPUT2_COMPUTE_TYPE value = value_packed;
 #endif
 
-        acc += tmp_buf[tmp_buf_offset] * value;
+        acc += DECODE_OUTPUT_COMPUTE_TYPE(tmp_buf[tmp_buf_offset]) * value;
     }
 
     uint output_offset = OUTPUT_GET_INDEX(b0, b1, target_seq_idx, head_size_idx);
-    output[output_offset] = acc;
+    output[output_offset] = TO_OUTPUT_TYPE(acc);
 }
