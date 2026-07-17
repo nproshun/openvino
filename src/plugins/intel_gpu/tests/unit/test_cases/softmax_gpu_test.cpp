@@ -1279,6 +1279,16 @@ TEST(softmax_gpu_bfyx_f16, opt_softmax_bf_axis_3) {
     run_softmax_bfyx_opt<ov::float16>(1, 4, 2, 3083, 3);
 }
 
-//TEST(softmax_gpu_bfyx_bf16, opt_softmax_bf_axis_3) {
-//    run_softmax_bfyx_opt<ov::bfloat16>(1, 4, 2, 3083, 3);
-//}
+TEST(softmax_gpu_bfyx_bf16, opt_softmax_bf_axis_3) {
+    run_softmax_bfyx_opt<ov::bfloat16>(1, 4, 2, 3083, 3);
+}
+
+// Large data set size (> 32 * max_lws) forces the dynamic softmax_gpu_bf kernel to take the
+// use_output_buffer path, since items_num exceeds the fixed dynamic STACK_SIZE (34).
+TEST(softmax_gpu_bfyx_f16, opt_softmax_bf_use_output_buffer) {
+    run_softmax_bfyx_opt<ov::float16>(1, 1, 1, 40000, 3);
+}
+
+TEST(softmax_gpu_bfyx_bf16, opt_softmax_bf_use_output_buffer) {
+    run_softmax_bfyx_opt<ov::bfloat16>(1, 1, 1, 40000, 3);
+}
