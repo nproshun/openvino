@@ -494,4 +494,5 @@ KERNEL (softmax_gpu_continuous_bfyx)(
 }
 #undef BLOCK_READ
 #undef BLOCK_WRITE
-#undef BLOCK_TYPE
+#undef BLOCK_IN_TYPE
+#undef BLOCK_OUT_TYPE
